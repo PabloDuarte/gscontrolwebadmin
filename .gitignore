@@ -1,0 +1,27 @@
+# Dependencias
+node_modules/
+
+# Variables de entorno (contienen credenciales reales)
+.env
+.env.local
+.env.*.local
+
+# Llaves y secretos - nunca versionar
+*.pem
+*.key
+*.ppk
+id_rsa*
+id_ed25519*
+*.p12
+.secrets/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Next.js
+.next/
+out/
+
+# Sistema
+.DS_Store
