@@ -6,7 +6,7 @@ export default function NuevaEmpresaPage() {
     <>
       <PageHeader
         titulo="Nueva empresa"
-        descripcion="Alta de un cliente. La suscripción se asigna después de guardar."
+        descripcion="Alta de particulares. Después, desde el listado, abre la ficha para asignar suscripción y conexión a la base de datos."
       />
       <EmpresaForm />
     </>

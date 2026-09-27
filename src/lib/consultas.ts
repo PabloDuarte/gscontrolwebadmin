@@ -2,8 +2,9 @@ import 'server-only';
 import { asc, desc, eq } from 'drizzle-orm';
 import { db } from '@/lib/db/control';
 import { conexionesBd, empresas, planes, suscripciones } from '@/lib/db/schema';
+import { elegirSuscripcionActual } from '@/lib/suscripciones';
 
-/** Empresa con su suscripcion mas reciente y el estado de su conexion. */
+/** Empresa con su suscripcion actual y el estado de su conexion. */
 export async function listarEmpresas() {
   const [filasEmpresas, filasSuscripciones, filasConexiones, filasPlanes] = await Promise.all([
     db.select().from(empresas).orderBy(asc(empresas.nombreComercial)),
@@ -14,14 +15,16 @@ export async function listarEmpresas() {
 
   const planPorId = new Map(filasPlanes.map((p) => [p.id, p]));
   const conexionPorEmpresa = new Map(filasConexiones.map((c) => [c.empresaId, c]));
-  const suscripcionPorEmpresa = new Map<number, (typeof filasSuscripciones)[number]>();
+  const historialPorEmpresa = new Map<number, (typeof filasSuscripciones)[number][]>();
+
   for (const s of filasSuscripciones) {
-    // Vienen ordenadas por fecha de fin descendente, la primera es la vigente.
-    if (!suscripcionPorEmpresa.has(s.empresaId)) suscripcionPorEmpresa.set(s.empresaId, s);
+    const lista = historialPorEmpresa.get(s.empresaId);
+    if (lista) lista.push(s);
+    else historialPorEmpresa.set(s.empresaId, [s]);
   }
 
   return filasEmpresas.map((empresa) => {
-    const suscripcion = suscripcionPorEmpresa.get(empresa.id) ?? null;
+    const suscripcion = elegirSuscripcionActual(historialPorEmpresa.get(empresa.id) ?? []);
     return {
       empresa,
       conexion: conexionPorEmpresa.get(empresa.id) ?? null,

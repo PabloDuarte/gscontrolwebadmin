@@ -14,7 +14,7 @@ export function PageHeader({
       <div className="flex min-w-0 items-start gap-4">
         {imagen}
         <div className="min-w-0 space-y-1">
-          <h1 className="text-4xl font-semibold tracking-tight lg:text-5xl">{titulo}</h1>
+          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{titulo}</h1>
           {descripcion ? (
             <p className="text-base text-muted-foreground">{descripcion}</p>
           ) : null}

@@ -4,29 +4,22 @@ import { LoginForm } from './login-form';
 
 export default function LoginPage() {
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-4">
-      <div className="pointer-events-none absolute inset-0">
-        <div className="absolute -left-32 top-16 size-[28rem] rounded-full bg-[#0071E3]/10 blur-3xl" />
-        <div className="absolute -right-24 bottom-0 size-[22rem] rounded-full bg-black/5 blur-3xl dark:bg-white/5" />
-      </div>
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden px-4">
+      <div
+        aria-hidden
+        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+        style={{ backgroundImage: "url('/brand/login-bg.jpg')" }}
+      />
+      <div aria-hidden className="absolute inset-0 bg-black/45" />
 
-      <div className="relative w-full max-w-[400px] space-y-10 text-center">
-        <div className="space-y-5">
-          <BrandLogo className="mx-auto h-8" priority />
-          <div className="space-y-2">
-            <h1 className="text-5xl font-semibold tracking-tight">GsControl</h1>
-            <p className="text-base text-muted-foreground">Panel de administración de clientes</p>
-          </div>
+      <div className="relative w-full max-w-[400px] space-y-8 text-center">
+        <div className="space-y-4">
+          <BrandLogo className="mx-auto h-9" priority />
+          <p className="text-base text-white/90">Panel de administración de clientes</p>
         </div>
 
-        <Card className="shadow-apple-lg">
+        <Card className="border-white/10 bg-white/95 shadow-apple-lg backdrop-blur-md dark:bg-black/80">
           <CardContent className="space-y-6 p-8 text-left">
-            <div className="space-y-1">
-              <h2 className="text-xl font-semibold tracking-tight">Iniciar sesión</h2>
-              <p className="text-sm text-muted-foreground">
-                Acceso exclusivo del personal de INTECONAYC.
-              </p>
-            </div>
             <LoginForm />
           </CardContent>
         </Card>

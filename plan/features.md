@@ -22,14 +22,16 @@ Login con correo y contraseña contra `usuarios_admin`. Sin registro público y 
 todavía. Las cuentas se crean a mano desde el seed. Todo el panel queda detrás del login.
 
 **Administración de empresas clientes**
-Alta, edición y baja de empresas. Ficha con código, nombre comercial, razón social, RFC, datos de
-contacto, estado y notas. Listado con búsqueda, filtro por estado y orden por columna.
+Alta, edición y baja de empresas. En el alta solo se capturan los particulares (nombre,
+RFC / ID fiscal como identificador, contacto, estado, logo y notas). La suscripción y la
+conexión a la base de datos se asignan después, al abrir la empresa desde el listado.
+Listado con búsqueda, filtro por estado y orden por columna.
 
 **Parámetros de conexión por empresa**
-Capturar cómo conectarse a la base que usará cada empresa: host, puerto, nombre de la base, usuario
-y contraseña, más los datos de túnel SSH si vive en otro servidor. La contraseña se guarda cifrada
-con AES-256-GCM, nunca en claro. Incluye una acción de probar conexión que registra la fecha de la
-última verificación exitosa.
+En la ficha de la empresa se captura cómo conectarse a su base: host, puerto, nombre de la
+base, usuario y contraseña, más los datos de túnel SSH si vive en otro servidor. La
+contraseña se guarda cifrada con AES-256-GCM, nunca en claro. Incluye una acción de probar
+conexión que registra la fecha de la última verificación exitosa.
 
 **Catálogo de planes**
 Planes con código, nombre, descripción, precio, moneda, periodicidad sugerida y límites de
@@ -53,9 +55,9 @@ Logo de intecontrol.com en el login y la barra lateral. El favicon de la empresa
 pestaña del navegador y al usuario admin en el pie del menú.
 
 **Logo por empresa**
-Al dar de alta un cliente se pide su logo (PNG, JPG, WEBP o SVG). Se guarda en
-`empresas.logo_path` para el login y el panel de esa empresa, y se muestra como miniatura en el
-listado y la ficha.
+Al dar de alta un cliente se pide su logo (PNG, JPG, WEBP o SVG). Se guarda ligado al
+RFC / ID fiscal en `empresas.logo_path` para el login y el panel de esa empresa, y se muestra
+como miniatura en el listado y la ficha.
 
 ---
 

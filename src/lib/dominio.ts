@@ -1,3 +1,6 @@
+/** Valor visual del campo de contraseña de conexión: no es la real y no se guarda. */
+export const PASSWORD_ENMASCARADA = '••••••••';
+
 export const ESTADOS_EMPRESA = [
   'prospecto',
   'prueba',

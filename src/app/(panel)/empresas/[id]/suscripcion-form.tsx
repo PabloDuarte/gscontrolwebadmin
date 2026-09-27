@@ -10,11 +10,13 @@ import { guardarSuscripcion, type EstadoFormulario } from '../actions';
 
 type PlanOpcion = { id: number; nombre: string; precio: string; moneda: string };
 
+const ESTADOS_ALTA = ESTADOS_SUSCRIPCION.filter((e) => e !== 'cancelada');
+
 function Guardar() {
   const { pending } = useFormStatus();
   return (
     <Button type="submit" size="sm" disabled={pending}>
-      {pending ? 'Guardando…' : 'Guardar suscripción'}
+      {pending ? 'Guardando…' : 'Asignar suscripción'}
     </Button>
   );
 }
@@ -22,22 +24,9 @@ function Guardar() {
 export function SuscripcionForm({
   empresaId,
   planes,
-  actual,
 }: {
   empresaId: number;
   planes: PlanOpcion[];
-  actual?: {
-    id: number;
-    planId: number;
-    estado: string;
-    fechaInicio: string;
-    fechaFin: string;
-    precio: string;
-    moneda: string;
-    periodicidad: string;
-    renovacionAutomatica: boolean;
-    notas: string | null;
-  } | null;
 }) {
   const [estado, accion] = useActionState<EstadoFormulario | undefined, FormData>(
     guardarSuscripcion,
@@ -58,11 +47,14 @@ export function SuscripcionForm({
   return (
     <form action={accion} className="space-y-4">
       <input type="hidden" name="empresaId" value={empresaId} />
-      {actual ? <input type="hidden" name="id" value={actual.id} /> : null}
+      <p className="text-sm text-muted-foreground">
+        Solo puede haber una suscripción activa. Si ya había una, cancélala antes; la anterior
+        queda en el historial.
+      </p>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Plan" htmlFor="planId" error={error('planId')}>
-          <Select id="planId" name="planId" defaultValue={actual?.planId ?? planes[0].id}>
+          <Select id="planId" name="planId" defaultValue={planes[0].id}>
             {planes.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.nombre}
@@ -72,8 +64,8 @@ export function SuscripcionForm({
         </Field>
 
         <Field label="Estado" htmlFor="estadoSuscripcion" error={error('estado')}>
-          <Select id="estadoSuscripcion" name="estado" defaultValue={actual?.estado ?? 'activa'}>
-            {ESTADOS_SUSCRIPCION.map((e) => (
+          <Select id="estadoSuscripcion" name="estado" defaultValue="activa">
+            {ESTADOS_ALTA.map((e) => (
               <option key={e} value={e}>
                 {capitalizar(e)}
               </option>
@@ -82,23 +74,11 @@ export function SuscripcionForm({
         </Field>
 
         <Field label="Inicio" htmlFor="fechaInicio" error={error('fechaInicio')}>
-          <Input
-            id="fechaInicio"
-            name="fechaInicio"
-            type="date"
-            defaultValue={actual?.fechaInicio ?? hoy}
-            required
-          />
+          <Input id="fechaInicio" name="fechaInicio" type="date" defaultValue={hoy} required />
         </Field>
 
         <Field label="Fin" htmlFor="fechaFin" error={error('fechaFin')}>
-          <Input
-            id="fechaFin"
-            name="fechaFin"
-            type="date"
-            defaultValue={actual?.fechaFin ?? ''}
-            required
-          />
+          <Input id="fechaFin" name="fechaFin" type="date" required />
         </Field>
 
         <Field label="Precio pactado" htmlFor="precio" error={error('precio')}>
@@ -108,20 +88,16 @@ export function SuscripcionForm({
             type="number"
             step="0.01"
             min="0"
-            defaultValue={actual?.precio ?? planes[0].precio}
+            defaultValue={planes[0].precio}
           />
         </Field>
 
         <Field label="Moneda" htmlFor="moneda" error={error('moneda')}>
-          <Input id="moneda" name="moneda" maxLength={3} defaultValue={actual?.moneda ?? 'MXN'} />
+          <Input id="moneda" name="moneda" maxLength={3} defaultValue={planes[0].moneda ?? 'MXN'} />
         </Field>
 
         <Field label="Periodicidad" htmlFor="periodicidad" error={error('periodicidad')}>
-          <Select
-            id="periodicidad"
-            name="periodicidad"
-            defaultValue={actual?.periodicidad ?? 'mensual'}
-          >
+          <Select id="periodicidad" name="periodicidad" defaultValue="mensual">
             {PERIODICIDADES.map((p) => (
               <option key={p} value={p}>
                 {ETIQUETA_PERIODICIDAD[p]}
@@ -135,7 +111,6 @@ export function SuscripcionForm({
             <input
               type="checkbox"
               name="renovacionAutomatica"
-              defaultChecked={actual?.renovacionAutomatica ?? false}
               className="size-4 rounded-md border-input accent-primary"
             />
             Renovación automática
@@ -143,7 +118,7 @@ export function SuscripcionForm({
         </div>
 
         <Field label="Notas" htmlFor="notasSuscripcion" className="sm:col-span-2">
-          <Textarea id="notasSuscripcion" name="notas" defaultValue={actual?.notas ?? ''} />
+          <Textarea id="notasSuscripcion" name="notas" />
         </Field>
       </div>
 

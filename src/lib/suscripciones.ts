@@ -12,6 +12,27 @@ export type Vigencia = {
   tono: 'neutro' | 'exito' | 'aviso' | 'peligro' | 'info';
 };
 
+/** Una suscripcion en curso no se edita: hay que cancelarla para cambiar de plan. */
+export function esSuscripcionEnCurso(estado: EstadoSuscripcion | string): boolean {
+  return estado === 'activa' || estado === 'prueba';
+}
+
+/**
+ * Elige la suscripcion que representa a la empresa en listados y tablero:
+ * primero una en curso; si no, la mas reciente no cancelada por fechaFin.
+ */
+export function elegirSuscripcionActual<T extends { estado: string; fechaFin: string }>(
+  filas: T[],
+): T | null {
+  const enCurso = filas.find((s) => esSuscripcionEnCurso(s.estado));
+  if (enCurso) return enCurso;
+
+  const noCanceladas = filas.filter((s) => s.estado !== 'cancelada');
+  if (noCanceladas.length === 0) return null;
+
+  return [...noCanceladas].sort((a, b) => b.fechaFin.localeCompare(a.fechaFin))[0] ?? null;
+}
+
 /** Dias entre hoy y la fecha de fin. Negativo si ya paso. */
 export function diasParaVencer(fechaFin: string): number {
   const [anio, mes, dia] = fechaFin.split('-').map(Number);

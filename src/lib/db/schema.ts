@@ -44,7 +44,7 @@ export const empresas = mysqlTable(
     codigo: varchar('codigo', { length: 40 }).notNull().unique(),
     nombreComercial: varchar('nombre_comercial', { length: 150 }).notNull(),
     razonSocial: varchar('razon_social', { length: 200 }),
-    rfc: varchar('rfc', { length: 13 }),
+    rfc: varchar('rfc', { length: 13 }).notNull().unique(),
     contactoNombre: varchar('contacto_nombre', { length: 150 }),
     contactoEmail: varchar('contacto_email', { length: 190 }),
     contactoTelefono: varchar('contacto_telefono', { length: 40 }),
