@@ -10,6 +10,7 @@ import { conexionesBd, empresas, suscripciones } from '@/lib/db/schema';
 import { probarConexionEmpresa } from '@/lib/db/tenant';
 import { cifrar } from '@/lib/crypto';
 import { ESTADOS_EMPRESA, ESTADOS_SUSCRIPCION, PERIODICIDADES } from '@/lib/dominio';
+import { borrarLogoEmpresa, guardarLogoEmpresa, validarLogo } from '@/lib/uploads';
 
 export type EstadoFormulario = {
   ok?: boolean;
@@ -108,14 +109,42 @@ export async function guardarEmpresa(
   }
 
   const valores = empresaAnalizada.data;
+  const archivoLogo = datos.get('logo');
+  const logo = archivoLogo instanceof File ? archivoLogo : null;
+  const errorLogo = validarLogo(logo, !id);
+  if (errorLogo) {
+    return { errores: { logo: errorLogo.mensaje } };
+  }
+
   let empresaId = id;
+  let logoAnterior: string | null = null;
 
   try {
     if (empresaId) {
-      await db.update(empresas).set(valores).where(eq(empresas.id, empresaId));
+      const [actual] = await db
+        .select({ logoPath: empresas.logoPath })
+        .from(empresas)
+        .where(eq(empresas.id, empresaId))
+        .limit(1);
+      logoAnterior = actual?.logoPath ?? null;
+    }
+
+    let logoPath = logoAnterior;
+    if (logo && logo.size > 0) {
+      logoPath = await guardarLogoEmpresa(valores.codigo, logo);
+    }
+
+    const ficha = { ...valores, logoPath };
+
+    if (empresaId) {
+      await db.update(empresas).set(ficha).where(eq(empresas.id, empresaId));
     } else {
-      const [insertado] = await db.insert(empresas).values(valores).$returningId();
+      const [insertado] = await db.insert(empresas).values(ficha).$returningId();
       empresaId = insertado.id;
+    }
+
+    if (logo && logo.size > 0 && logoAnterior && logoAnterior !== logoPath) {
+      await borrarLogoEmpresa(logoAnterior);
     }
 
     if (conexionAnalizada?.success) {
@@ -166,7 +195,13 @@ export async function eliminarEmpresa(datos: FormData) {
   await exigirSesion();
   const id = Number(datos.get('id'));
   if (Number.isInteger(id)) {
+    const [actual] = await db
+      .select({ logoPath: empresas.logoPath })
+      .from(empresas)
+      .where(eq(empresas.id, id))
+      .limit(1);
     await db.delete(empresas).where(eq(empresas.id, id));
+    await borrarLogoEmpresa(actual?.logoPath);
   }
   revalidatePath('/empresas');
   revalidatePath('/');

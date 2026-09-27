@@ -10,7 +10,7 @@ import { iniciarSesion } from './actions';
 function BotonEnviar() {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" className="w-full" disabled={pending}>
+    <Button type="submit" className="w-full" size="lg" disabled={pending}>
       {pending ? 'Entrando…' : 'Entrar'}
     </Button>
   );
@@ -20,7 +20,7 @@ export function LoginForm() {
   const [error, accion] = useActionState(iniciarSesion, undefined);
 
   return (
-    <form action={accion} className="space-y-4">
+    <form action={accion} className="space-y-5">
       <Field label="Correo" htmlFor="email">
         <Input
           id="email"
@@ -37,7 +37,7 @@ export function LoginForm() {
       </Field>
 
       {error ? (
-        <p className="flex items-center gap-2 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+        <p className="flex items-center gap-2 rounded-2xl bg-destructive/10 px-3.5 py-2.5 text-sm text-destructive">
           <AlertCircle className="size-4 shrink-0" />
           {error}
         </p>

@@ -122,12 +122,12 @@ export function PlanForm({ plan }: { plan?: PlanVisible }) {
             />
           </Field>
 
-          <label className="flex items-center gap-2 text-sm sm:col-span-2">
+          <label className="flex items-center gap-2.5 text-sm sm:col-span-2">
             <input
               type="checkbox"
               name="activo"
               defaultChecked={plan?.activo ?? true}
-              className="size-4 rounded border-input accent-[hsl(var(--primary))]"
+              className="size-4 rounded-md border-input accent-primary"
             />
             Plan activo y disponible para asignar
           </label>
@@ -135,7 +135,7 @@ export function PlanForm({ plan }: { plan?: PlanVisible }) {
       </Card>
 
       {estado?.mensaje ? (
-        <p className="flex items-center gap-2 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+        <p className="flex items-center gap-2 rounded-2xl bg-destructive/10 px-3.5 py-2.5 text-sm text-destructive">
           <AlertCircle className="size-4 shrink-0" />
           {estado.mensaje}
         </p>

@@ -44,8 +44,18 @@ Avisar cuando una suscripción está por vencer, a 30, 15 y 7 días, y cuando ya
 como resumen en el tablero de inicio y como etiqueta de color en el listado de empresas.
 
 **Interfaz limpia y actual**
-Barra lateral fija, paleta neutra con un solo acento, color reservado para los estados, tema claro y
-oscuro, tablas con filtros y formularios con validación en línea.
+Barra lateral fija, paleta de apple.com (fondo blanco, texto #1d1d1f, acento #0071e3), color
+reservado para los estados, tema claro y oscuro, tablas con filtros y formularios con validación
+en línea.
+
+**Marca de Intecontrol**
+Logo de intecontrol.com en el login y la barra lateral. El favicon de la empresa identifica la
+pestaña del navegador y al usuario admin en el pie del menú.
+
+**Logo por empresa**
+Al dar de alta un cliente se pide su logo (PNG, JPG, WEBP o SVG). Se guarda en
+`empresas.logo_path` para el login y el panel de esa empresa, y se muestra como miniatura en el
+listado y la ficha.
 
 ---
 

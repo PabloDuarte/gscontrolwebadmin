@@ -3,7 +3,7 @@ import { Plus, Tags } from 'lucide-react';
 import { PageHeader } from '@/components/page-header';
 import { Badge } from '@/components/ui/badge';
 import { buttonVariants } from '@/components/ui/button';
-import { EmptyRow, TBody, TD, TH, THead, TR, Table } from '@/components/ui/table';
+import { Card } from '@/components/ui/card';
 import { listarPlanes } from '@/lib/consultas';
 import { ETIQUETA_PERIODICIDAD, type Periodicidad } from '@/lib/dominio';
 import { formatearMoneda } from '@/lib/utils';
@@ -28,57 +28,57 @@ export default async function PlanesPage() {
         }
       />
 
-      <Table>
-        <THead>
-          <TR>
-            <TH>Plan</TH>
-            <TH>Precio</TH>
-            <TH>Límites</TH>
-            <TH>Estado</TH>
-          </TR>
-        </THead>
-        <TBody>
-          {catalogo.length === 0 ? (
-            <EmptyRow colSpan={4}>
-              <Tags className="mx-auto mb-3 size-8 text-muted-foreground" />
-              <p className="mb-4 text-sm text-muted-foreground">Todavía no hay planes.</p>
-              <Link href="/planes/nuevo" className={buttonVariants()}>
-                <Plus />
-                Crear el primero
-              </Link>
-            </EmptyRow>
-          ) : (
-            catalogo.map((plan) => (
-              <TR key={plan.id}>
-                <TD>
-                  <Link
-                    href={`/planes/${plan.id}`}
-                    className="font-medium hover:text-primary hover:underline"
-                  >
-                    {plan.nombre}
-                  </Link>
-                  <p className="text-xs text-muted-foreground">{plan.codigo}</p>
-                </TD>
-                <TD>
-                  {formatearMoneda(plan.precio, plan.moneda)}
-                  <p className="text-xs text-muted-foreground">
-                    {ETIQUETA_PERIODICIDAD[plan.periodicidad as Periodicidad]}
-                  </p>
-                </TD>
-                <TD className="text-xs text-muted-foreground">
-                  {limite(plan.maxEmpleados)} empleados · {limite(plan.maxDispositivos)} dispositivos ·{' '}
-                  {limite(plan.maxUsuarios)} usuarios
-                </TD>
-                <TD>
+      {catalogo.length === 0 ? (
+        <Card className="flex flex-col items-center justify-center py-20 text-center">
+          <Tags className="mb-4 size-8 text-muted-foreground" />
+          <p className="mb-5 text-sm text-muted-foreground">Todavía no hay planes.</p>
+          <Link href="/planes/nuevo" className={buttonVariants()}>
+            <Plus />
+            Crear el primero
+          </Link>
+        </Card>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {catalogo.map((plan) => (
+            <Link
+              key={plan.id}
+              href={`/planes/${plan.id}`}
+              className="group block transition-transform duration-200 ease-apple hover:scale-[1.02] active:scale-[0.98]"
+            >
+              <Card className="flex h-full flex-col p-8 transition-shadow duration-200 group-hover:shadow-apple-lg">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                      {plan.codigo}
+                    </p>
+                    <h2 className="mt-1 text-2xl font-semibold tracking-tight">{plan.nombre}</h2>
+                  </div>
                   <Badge tono={plan.activo ? 'exito' : 'neutro'}>
                     {plan.activo ? 'Activo' : 'Inactivo'}
                   </Badge>
-                </TD>
-              </TR>
-            ))
-          )}
-        </TBody>
-      </Table>
+                </div>
+
+                <p className="mt-8 text-4xl font-semibold tracking-tight">
+                  {formatearMoneda(plan.precio, plan.moneda)}
+                </p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {ETIQUETA_PERIODICIDAD[plan.periodicidad as Periodicidad]}
+                </p>
+
+                {plan.descripcion ? (
+                  <p className="mt-5 line-clamp-2 text-sm text-muted-foreground">{plan.descripcion}</p>
+                ) : null}
+
+                <ul className="mt-auto space-y-2 pt-8 text-sm text-muted-foreground">
+                  <li>{limite(plan.maxEmpleados)} empleados</li>
+                  <li>{limite(plan.maxDispositivos)} dispositivos</li>
+                  <li>{limite(plan.maxUsuarios)} usuarios</li>
+                </ul>
+              </Card>
+            </Link>
+          ))}
+        </div>
+      )}
     </>
   );
 }

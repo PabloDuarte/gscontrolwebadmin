@@ -131,12 +131,12 @@ export function SuscripcionForm({
         </Field>
 
         <div className="flex items-end">
-          <label className="flex items-center gap-2 pb-2 text-sm">
+          <label className="flex items-center gap-2.5 pb-2 text-sm">
             <input
               type="checkbox"
               name="renovacionAutomatica"
               defaultChecked={actual?.renovacionAutomatica ?? false}
-              className="size-4 rounded border-input accent-[hsl(var(--primary))]"
+              className="size-4 rounded-md border-input accent-primary"
             />
             Renovación automática
           </label>
@@ -149,7 +149,7 @@ export function SuscripcionForm({
 
       {estado?.mensaje ? (
         <p
-          className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm ${
+          className={`flex items-center gap-2 rounded-2xl px-3.5 py-2.5 text-sm ${
             estado.ok
               ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
               : 'bg-destructive/10 text-destructive'

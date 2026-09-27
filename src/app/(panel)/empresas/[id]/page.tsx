@@ -1,9 +1,10 @@
 import { notFound } from 'next/navigation';
+import { LogoEmpresa } from '@/components/brand-logo';
 import { PageHeader } from '@/components/page-header';
 import { ConfirmSubmit } from '@/components/confirm-submit';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { EmptyRow, TBody, TD, TH, THead, TR, Table } from '@/components/ui/table';
+import { TBody, TD, TH, THead, TR, Table } from '@/components/ui/table';
 import { obtenerEmpresa } from '@/lib/consultas';
 import { TONO_EMPRESA, capitalizar, type EstadoEmpresa } from '@/lib/dominio';
 import { calcularVigencia } from '@/lib/suscripciones';
@@ -34,6 +35,13 @@ export default async function EmpresaDetallePage({
       <PageHeader
         titulo={empresa.nombreComercial}
         descripcion={empresa.codigo}
+        imagen={
+          <LogoEmpresa
+            src={empresa.logoPath}
+            alt={empresa.nombreComercial}
+            tamano="md"
+          />
+        }
         acciones={
           <Badge tono={TONO_EMPRESA[empresa.estado as EstadoEmpresa]}>
             {capitalizar(empresa.estado)}
@@ -136,25 +144,24 @@ export default async function EmpresaDetallePage({
             </Table>
           </CardContent>
         </Card>
-      ) : suscripciones.length === 0 ? (
-        <Table>
-          <TBody>
-            <EmptyRow colSpan={1}>
-              <p className="text-sm text-muted-foreground">Sin historial de suscripciones.</p>
-            </EmptyRow>
-          </TBody>
-        </Table>
       ) : null}
 
-      <form action={eliminarEmpresa} className="border-t pt-6">
-        <input type="hidden" name="id" value={empresa.id} />
-        <p className="mb-3 text-sm text-muted-foreground">
-          Eliminar la empresa también borra su conexión y sus suscripciones.
-        </p>
-        <ConfirmSubmit mensaje="¿Eliminar esta empresa y todos sus datos de control?">
-          Eliminar empresa
-        </ConfirmSubmit>
-      </form>
+      <Card className="border-destructive/20">
+        <CardHeader>
+          <CardTitle>Eliminar empresa</CardTitle>
+          <CardDescription>
+            También borra su conexión y sus suscripciones. Esta acción no se puede deshacer.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form action={eliminarEmpresa}>
+            <input type="hidden" name="id" value={empresa.id} />
+            <ConfirmSubmit mensaje="¿Eliminar esta empresa y todos sus datos de control?">
+              Eliminar empresa
+            </ConfirmSubmit>
+          </form>
+        </CardContent>
+      </Card>
     </>
   );
 }

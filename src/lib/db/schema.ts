@@ -50,6 +50,7 @@ export const empresas = mysqlTable(
     contactoTelefono: varchar('contacto_telefono', { length: 40 }),
     estado: mysqlEnum('estado', ESTADOS_EMPRESA).notNull().default('prospecto'),
     fechaAlta: date('fecha_alta', { mode: 'string' }).notNull(),
+    logoPath: varchar('logo_path', { length: 255 }),
     notas: text('notas'),
     creadoEn,
     actualizadoEn,

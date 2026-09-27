@@ -4,6 +4,7 @@ import { useActionState, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import Link from 'next/link';
 import { AlertCircle } from 'lucide-react';
+import { LogoEmpresa } from '@/components/brand-logo';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field, Input, Select, Textarea } from '@/components/ui/field';
@@ -34,6 +35,7 @@ export type EmpresaVisible = {
   contactoTelefono: string | null;
   estado: string;
   fechaAlta: string;
+  logoPath: string | null;
   notas: string | null;
 };
 
@@ -59,6 +61,7 @@ export function EmpresaForm({
   );
   const [configurarConexion, setConfigurarConexion] = useState(Boolean(conexion));
   const [usaTunel, setUsaTunel] = useState(conexion?.usaTunelSsh ?? false);
+  const [vistaPrevia, setVistaPrevia] = useState<string | null>(empresa?.logoPath ?? null);
 
   const error = (campo: string) => estado?.errores?.[campo];
   const hoy = new Date().toISOString().slice(0, 10);
@@ -144,6 +147,34 @@ export function EmpresaForm({
             />
           </Field>
 
+          <Field
+            label="Logo"
+            htmlFor="logo"
+            className="sm:col-span-2"
+            error={error('logo')}
+            hint="Wordmark rectangular, como el de Intecontrol. PNG, JPG, WEBP o SVG, máximo 2 MB."
+          >
+            <div className="flex items-center gap-3">
+              <LogoEmpresa
+                src={vistaPrevia}
+                alt={empresa?.nombreComercial ?? 'Logo'}
+                tamano="lg"
+              />
+              <Input
+                id="logo"
+                name="logo"
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                required={!empresa}
+                className="h-auto py-2"
+                onChange={(e) => {
+                  const archivo = e.target.files?.[0];
+                  setVistaPrevia(archivo ? URL.createObjectURL(archivo) : (empresa?.logoPath ?? null));
+                }}
+              />
+            </div>
+          </Field>
+
           <Field label="Notas" htmlFor="notas" className="sm:col-span-2" error={error('notas')}>
             <Textarea id="notas" name="notas" defaultValue={empresa?.notas ?? ''} />
           </Field>
@@ -158,11 +189,11 @@ export function EmpresaForm({
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <label className="flex items-center gap-2 text-sm">
+          <label className="flex items-center gap-2.5 text-sm">
             <input
               type="checkbox"
               name="configurarConexion"
-              className="size-4 rounded border-input accent-[hsl(var(--primary))]"
+              className="size-4 rounded-md border-input accent-primary"
               checked={configurarConexion}
               onChange={(e) => setConfigurarConexion(e.target.checked)}
             />
@@ -202,11 +233,11 @@ export function EmpresaForm({
                 <Input id="password" name="password" type="password" autoComplete="new-password" />
               </Field>
 
-              <label className="flex items-center gap-2 text-sm sm:col-span-2">
+              <label className="flex items-center gap-2.5 text-sm sm:col-span-2">
                 <input
                   type="checkbox"
                   name="usaTunelSsh"
-                  className="size-4 rounded border-input accent-[hsl(var(--primary))]"
+                  className="size-4 rounded-md border-input accent-primary"
                   checked={usaTunel}
                   onChange={(e) => setUsaTunel(e.target.checked)}
                 />
@@ -252,7 +283,7 @@ export function EmpresaForm({
       </Card>
 
       {estado?.mensaje ? (
-        <p className="flex items-center gap-2 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+        <p className="flex items-center gap-2 rounded-2xl bg-destructive/10 px-3.5 py-2.5 text-sm text-destructive">
           <AlertCircle className="size-4 shrink-0" />
           {estado.mensaje}
         </p>

@@ -3,14 +3,14 @@ import { cn } from '@/lib/utils';
 
 export function Table({ className, ...props }: React.TableHTMLAttributes<HTMLTableElement>) {
   return (
-    <div className="w-full overflow-x-auto rounded-lg border">
+    <div className="w-full overflow-x-auto">
       <table className={cn('w-full caption-bottom text-sm', className)} {...props} />
     </div>
   );
 }
 
 export function THead({ className, ...props }: React.HTMLAttributes<HTMLTableSectionElement>) {
-  return <thead className={cn('bg-muted/50 [&_tr]:border-b', className)} {...props} />;
+  return <thead className={cn('[&_tr]:border-b [&_tr]:border-black/5 dark:[&_tr]:border-white/10', className)} {...props} />;
 }
 
 export function TBody({ className, ...props }: React.HTMLAttributes<HTMLTableSectionElement>) {
@@ -18,14 +18,22 @@ export function TBody({ className, ...props }: React.HTMLAttributes<HTMLTableSec
 }
 
 export function TR({ className, ...props }: React.HTMLAttributes<HTMLTableRowElement>) {
-  return <tr className={cn('border-b transition-colors hover:bg-muted/40', className)} {...props} />;
+  return (
+    <tr
+      className={cn(
+        'border-b border-black/5 transition-colors duration-200 ease-apple hover:bg-black/[0.03] dark:border-white/10 dark:hover:bg-white/[0.04]',
+        className,
+      )}
+      {...props}
+    />
+  );
 }
 
 export function TH({ className, ...props }: React.ThHTMLAttributes<HTMLTableCellElement>) {
   return (
     <th
       className={cn(
-        'h-10 px-4 text-left align-middle text-xs font-medium uppercase tracking-wide text-muted-foreground',
+        'h-11 px-4 text-left align-middle text-[11px] font-medium uppercase tracking-wider text-muted-foreground',
         className,
       )}
       {...props}
@@ -34,14 +42,14 @@ export function TH({ className, ...props }: React.ThHTMLAttributes<HTMLTableCell
 }
 
 export function TD({ className, ...props }: React.TdHTMLAttributes<HTMLTableCellElement>) {
-  return <td className={cn('px-4 py-3 align-middle', className)} {...props} />;
+  return <td className={cn('px-4 py-4 align-middle', className)} {...props} />;
 }
 
 /** Fila que ocupa toda la tabla cuando no hay datos, con una accion sugerida. */
 export function EmptyRow({ colSpan, children }: { colSpan: number; children: React.ReactNode }) {
   return (
     <tr>
-      <td colSpan={colSpan} className="px-4 py-12 text-center">
+      <td colSpan={colSpan} className="px-4 py-16 text-center">
         {children}
       </td>
     </tr>

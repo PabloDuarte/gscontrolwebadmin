@@ -1,10 +1,11 @@
 import Link from 'next/link';
 import { Building2, Plus } from 'lucide-react';
+import { LogoEmpresa } from '@/components/brand-logo';
 import { PageHeader } from '@/components/page-header';
 import { Badge } from '@/components/ui/badge';
 import { buttonVariants } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import { Input, Select } from '@/components/ui/field';
-import { EmptyRow, TBody, TD, TH, THead, TR, Table } from '@/components/ui/table';
 import { listarEmpresas } from '@/lib/consultas';
 import { ESTADOS_EMPRESA, TONO_EMPRESA, capitalizar, type EstadoEmpresa } from '@/lib/dominio';
 import { calcularVigencia } from '@/lib/suscripciones';
@@ -47,9 +48,9 @@ export default async function EmpresasPage({
           name="q"
           defaultValue={q}
           placeholder="Buscar por nombre o código…"
-          className="h-9 max-w-xs"
+          className="h-11 max-w-xs rounded-full"
         />
-        <Select name="estado" defaultValue={estado} className="h-9 max-w-[12rem]">
+        <Select name="estado" defaultValue={estado} className="h-11 max-w-[12rem] rounded-full">
           <option value="">Todos los estados</option>
           {ESTADOS_EMPRESA.map((e) => (
             <option key={e} value={e}>
@@ -62,87 +63,71 @@ export default async function EmpresasPage({
         </button>
       </form>
 
-      <Table>
-        <THead>
-          <TR>
-            <TH>Empresa</TH>
-            <TH>Estado</TH>
-            <TH>Plan</TH>
-            <TH>Vigencia</TH>
-            <TH>Base de datos</TH>
-          </TR>
-        </THead>
-        <TBody>
-          {filas.length === 0 ? (
-            <EmptyRow colSpan={5}>
-              <Building2 className="mx-auto mb-3 size-8 text-muted-foreground" />
-              <p className="mb-4 text-sm text-muted-foreground">
-                {todas.length === 0
-                  ? 'Todavía no hay empresas registradas.'
-                  : 'Ninguna empresa coincide con el filtro.'}
-              </p>
-              {todas.length === 0 ? (
-                <Link href="/empresas/nueva" className={buttonVariants()}>
-                  <Plus />
-                  Dar de alta la primera
-                </Link>
-              ) : null}
-            </EmptyRow>
-          ) : (
-            filas.map(({ empresa, conexion, suscripcion, plan }) => {
-              const vigencia = suscripcion
-                ? calcularVigencia(suscripcion.fechaFin, suscripcion.estado)
-                : null;
+      {filas.length === 0 ? (
+        <Card className="flex flex-col items-center justify-center py-20 text-center">
+          <Building2 className="mb-4 size-8 text-muted-foreground" />
+          <p className="mb-5 text-sm text-muted-foreground">
+            {todas.length === 0
+              ? 'Todavía no hay empresas registradas.'
+              : 'Ninguna empresa coincide con el filtro.'}
+          </p>
+          {todas.length === 0 ? (
+            <Link href="/empresas/nueva" className={buttonVariants()}>
+              <Plus />
+              Dar de alta la primera
+            </Link>
+          ) : null}
+        </Card>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2">
+          {filas.map(({ empresa, conexion, suscripcion, plan }) => {
+            const vigencia = suscripcion
+              ? calcularVigencia(suscripcion.fechaFin, suscripcion.estado)
+              : null;
 
-              return (
-                <TR key={empresa.id}>
-                  <TD>
-                    <Link
-                      href={`/empresas/${empresa.id}`}
-                      className="font-medium hover:text-primary hover:underline"
-                    >
-                      {empresa.nombreComercial}
-                    </Link>
-                    <p className="text-xs text-muted-foreground">{empresa.codigo}</p>
-                  </TD>
-                  <TD>
+            return (
+              <Link
+                key={empresa.id}
+                href={`/empresas/${empresa.id}`}
+                className="group block transition-transform duration-200 ease-apple hover:scale-[1.02] active:scale-[0.98]"
+              >
+                <Card className="h-full p-6 transition-shadow duration-200 group-hover:shadow-apple-lg">
+                  <div className="flex items-start justify-between gap-3">
+                    <LogoEmpresa src={empresa.logoPath} alt={empresa.nombreComercial} tamano="md" />
                     <Badge tono={TONO_EMPRESA[empresa.estado as EstadoEmpresa]}>
                       {capitalizar(empresa.estado)}
                     </Badge>
-                  </TD>
-                  <TD className="text-muted-foreground">{plan?.nombre ?? '—'}</TD>
-                  <TD>
-                    {vigencia ? (
-                      <>
-                        <Badge tono={vigencia.tono}>{vigencia.etiqueta}</Badge>
+                  </div>
+                  <div className="mt-5 space-y-1">
+                    <h2 className="text-xl font-semibold tracking-tight">{empresa.nombreComercial}</h2>
+                    <p className="text-sm text-muted-foreground">{empresa.codigo}</p>
+                  </div>
+                  <div className="mt-6 flex flex-wrap items-end justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium">{plan?.nombre ?? 'Sin plan'}</p>
+                      {vigencia ? (
                         <p className="mt-1 text-xs text-muted-foreground">
                           {formatearFecha(suscripcion!.fechaFin)}
                         </p>
-                      </>
-                    ) : (
-                      <span className="text-sm text-muted-foreground">Sin suscripción</span>
-                    )}
-                  </TD>
-                  <TD>
-                    {conexion ? (
-                      <>
-                        <span className="font-mono text-xs">{conexion.nombreBd}</span>
-                        <p className="text-xs text-muted-foreground">
-                          {conexion.verificadaEn
-                            ? `Verificada ${formatearFecha(conexion.verificadaEn)}`
-                            : 'Sin verificar'}
-                        </p>
-                      </>
-                    ) : (
-                      <span className="text-sm text-muted-foreground">Sin configurar</span>
-                    )}
-                  </TD>
-                </TR>
-              );
-            })
-          )}
-        </TBody>
-      </Table>
+                      ) : (
+                        <p className="mt-1 text-xs text-muted-foreground">Sin suscripción</p>
+                      )}
+                    </div>
+                    {vigencia ? <Badge tono={vigencia.tono}>{vigencia.etiqueta}</Badge> : null}
+                  </div>
+                  <p className="mt-4 text-xs text-muted-foreground">
+                    {conexion
+                      ? conexion.verificadaEn
+                        ? `${conexion.nombreBd} · verificada ${formatearFecha(conexion.verificadaEn)}`
+                        : `${conexion.nombreBd} · sin verificar`
+                      : 'Base de datos sin configurar'}
+                  </p>
+                </Card>
+              </Link>
+            );
+          })}
+        </div>
+      )}
     </>
   );
 }

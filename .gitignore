@@ -23,5 +23,9 @@ npm-debug.log*
 .next/
 out/
 
+# Logos subidos de empresas (el branding de Intecontrol sí se versiona)
+public/uploads/**
+!public/uploads/.gitkeep
+
 # Sistema
 .DS_Store

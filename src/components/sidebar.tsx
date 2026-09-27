@@ -23,10 +23,10 @@ export function Sidebar() {
             key={href}
             href={href}
             className={cn(
-              'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+              'flex items-center gap-3 rounded-full px-3.5 py-2.5 text-sm font-medium transition-all duration-200 ease-apple',
               activo
-                ? 'bg-primary/10 text-primary'
-                : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+                ? 'bg-[#1d1d1f] text-white shadow-apple dark:bg-white dark:text-black'
+                : 'text-muted-foreground hover:bg-black/5 hover:text-foreground dark:hover:bg-white/10',
             )}
           >
             <Icono className="size-4" />
