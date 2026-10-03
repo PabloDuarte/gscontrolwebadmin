@@ -1,3 +1,4 @@
+import { connection } from 'next/server';
 import { notFound } from 'next/navigation';
 import { PageHeader } from '@/components/page-header';
 import { ConfirmSubmit } from '@/components/confirm-submit';
@@ -22,11 +23,14 @@ import { cancelarSuscripcion, eliminarEmpresa } from '../actions';
 import { EmpresaForm } from '../empresa-form';
 import { SuscripcionForm } from './suscripcion-form';
 
+export const dynamic = 'force-dynamic';
+
 export default async function EmpresaDetallePage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await connection();
   const { id } = await params;
   const empresaId = Number(id);
   if (!Number.isInteger(empresaId)) notFound();
@@ -59,6 +63,7 @@ export default async function EmpresaDetallePage({
         usuario: conexion.usuario,
         password: passwordConexion,
         verificadaEn: conexion.verificadaEn,
+        estadoVerificacion: conexion.estadoVerificacion,
         guardada: true,
       }
     : {
@@ -68,6 +73,7 @@ export default async function EmpresaDetallePage({
         usuario: lic?.dbUsuario ?? '',
         password: lic?.dbPassword ?? '',
         verificadaEn: null,
+        estadoVerificacion: null,
         guardada: false,
       };
 
@@ -92,6 +98,7 @@ export default async function EmpresaDetallePage({
       />
 
       <EmpresaForm
+        key={empresa.id}
         empresa={{ ...empresa, rfc: empresa.rfc ?? '' }}
         conexion={conexionVisible}
       />

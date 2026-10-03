@@ -7,13 +7,14 @@ import { z } from 'zod';
 import { auth } from '@/auth';
 import { db } from '@/lib/db/control';
 import { conexionesBd, empresas, planes, suscripciones, type ConexionBd } from '@/lib/db/schema';
-import { probarConexionEmpresa } from '@/lib/db/tenant';
+import { probarConexionEmpresa, type ResultadoPrueba } from '@/lib/db/tenant';
 import { cifrar } from '@/lib/crypto';
 import {
   ESTADOS_EMPRESA,
   ESTADOS_SUSCRIPCION,
   PASSWORD_ENMASCARADA,
   PERIODICIDADES,
+  type EstadoVerificacionBd,
 } from '@/lib/dominio';
 import {
   formatearTelefono,
@@ -255,7 +256,7 @@ export async function guardarEmpresa(
   revalidatePath('/empresas');
   revalidatePath('/');
   revalidatePath(`/empresas/${empresaId}`);
-  redirect('/empresas?guardado=1');
+  redirect('/empresas');
 }
 
 export async function eliminarEmpresa(datos: FormData) {
@@ -273,6 +274,34 @@ export async function eliminarEmpresa(datos: FormData) {
   revalidatePath('/empresas');
   revalidatePath('/');
   redirect('/empresas');
+}
+
+async function guardarResultadoPrueba(empresaId: number | null, resultado: ResultadoPrueba) {
+  if (!empresaId || !Number.isInteger(empresaId)) return;
+  const estado: EstadoVerificacionBd | null = resultado.ok
+    ? 'verificada'
+    : resultado.noExiste
+      ? 'no_existe'
+      : null;
+  if (!estado) return;
+
+  await db
+    .update(conexionesBd)
+    .set({ estadoVerificacion: estado, verificadaEn: sql`NOW()` })
+    .where(eq(conexionesBd.empresaId, empresaId));
+  revalidatePath('/empresas');
+  revalidatePath('/');
+  revalidatePath(`/empresas/${empresaId}`);
+}
+
+function mensajePrueba(nombreBd: string, resultado: ResultadoPrueba): EstadoFormulario {
+  if (resultado.ok) {
+    return { ok: true, mensaje: `Base ${nombreBd} verificada. Servidor ${resultado.version}.` };
+  }
+  if (resultado.noExiste) {
+    return { ok: false, mensaje: `Base ${nombreBd} no existe.` };
+  }
+  return { ok: false, mensaje: `No se pudo conectar: ${resultado.mensaje}` };
 }
 
 export async function probarConexion(
@@ -293,17 +322,8 @@ export async function probarConexion(
   }
 
   const resultado = await probarConexionEmpresa(conexion);
-
-  if (resultado.ok) {
-    await db
-      .update(conexionesBd)
-      .set({ verificadaEn: sql`NOW()` })
-      .where(eq(conexionesBd.id, conexion.id));
-    revalidatePath(`/empresas/${empresaId}`);
-    return { ok: true, mensaje: `Conexión correcta. Servidor ${resultado.version}.` };
-  }
-
-  return { ok: false, mensaje: `No se pudo conectar: ${resultado.mensaje}` };
+  await guardarResultadoPrueba(empresaId, resultado);
+  return mensajePrueba(conexion.nombreBd, resultado);
 }
 
 /** Prueba la conexión con los parámetros del formulario (alta o edición sin guardar). */
@@ -345,10 +365,8 @@ export async function probarConexionDesdeFormulario(
         sshKeyPath: null,
       };
       const resultado = await probarConexionEmpresa(temporal);
-      if (resultado.ok) {
-        return { ok: true, mensaje: `Conexión correcta. Servidor ${resultado.version}.` };
-      }
-      return { ok: false, mensaje: `No se pudo conectar: ${resultado.mensaje}` };
+      await guardarResultadoPrueba(empresaId, resultado);
+      return mensajePrueba(c.nombreBd, resultado);
     }
   }
 
@@ -370,15 +388,14 @@ export async function probarConexionDesdeFormulario(
     sshUsuario: null,
     sshKeyPath: null,
     verificadaEn: null,
+    estadoVerificacion: null,
     creadoEn: new Date(),
     actualizadoEn: new Date(),
   } satisfies ConexionBd;
 
   const resultado = await probarConexionEmpresa(temporal);
-  if (resultado.ok) {
-    return { ok: true, mensaje: `Conexión correcta. Servidor ${resultado.version}.` };
-  }
-  return { ok: false, mensaje: `No se pudo conectar: ${resultado.mensaje}` };
+  await guardarResultadoPrueba(empresaId, resultado);
+  return mensajePrueba(c.nombreBd, resultado);
 }
 
 const esquemaSuscripcion = z.object({

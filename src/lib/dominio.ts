@@ -1,14 +1,11 @@
 /** Valor visual del campo de contraseña de conexión: no es la real y no se guarda. */
 export const PASSWORD_ENMASCARADA = '••••••••';
 
-export const ESTADOS_EMPRESA = [
-  'prospecto',
-  'prueba',
-  'activa',
-  'suspendida',
-  'cancelada',
-] as const;
+export const ESTADOS_EMPRESA = ['activo', 'prueba', 'suspendido', 'cancelado'] as const;
 export type EstadoEmpresa = (typeof ESTADOS_EMPRESA)[number];
+
+export const ESTADOS_VERIFICACION_BD = ['verificada', 'no_existe'] as const;
+export type EstadoVerificacionBd = (typeof ESTADOS_VERIFICACION_BD)[number];
 
 export const ESTADOS_SUSCRIPCION = ['prueba', 'activa', 'vencida', 'cancelada'] as const;
 export type EstadoSuscripcion = (typeof ESTADOS_SUSCRIPCION)[number];
@@ -19,11 +16,10 @@ export type Periodicidad = (typeof PERIODICIDADES)[number];
 type Tono = 'neutro' | 'exito' | 'aviso' | 'peligro' | 'info';
 
 export const TONO_EMPRESA: Record<EstadoEmpresa, Tono> = {
-  prospecto: 'neutro',
+  activo: 'exito',
   prueba: 'info',
-  activa: 'exito',
-  suspendida: 'aviso',
-  cancelada: 'peligro',
+  suspendido: 'aviso',
+  cancelado: 'peligro',
 };
 
 export const TONO_SUSCRIPCION: Record<EstadoSuscripcion, Tono> = {

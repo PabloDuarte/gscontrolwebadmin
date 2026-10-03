@@ -16,6 +16,7 @@ import {
 import {
   ESTADOS_EMPRESA,
   ESTADOS_SUSCRIPCION,
+  ESTADOS_VERIFICACION_BD,
   PERIODICIDADES,
 } from '../dominio';
 
@@ -33,6 +34,8 @@ export const usuariosAdmin = mysqlTable('usuarios_admin', {
   nombre: varchar('nombre', { length: 150 }).notNull(),
   activo: boolean('activo').notNull().default(true),
   ultimoAcceso: datetime('ultimo_acceso'),
+  tokenRecuperacion: varchar('token_recuperacion', { length: 64 }),
+  tokenExpira: datetime('token_expira'),
   creadoEn,
   actualizadoEn,
 });
@@ -48,7 +51,7 @@ export const empresas = mysqlTable(
     contactoNombre: varchar('contacto_nombre', { length: 150 }),
     contactoEmail: varchar('contacto_email', { length: 190 }),
     contactoTelefono: varchar('contacto_telefono', { length: 40 }),
-    estado: mysqlEnum('estado', ESTADOS_EMPRESA).notNull().default('prospecto'),
+    estado: mysqlEnum('estado', ESTADOS_EMPRESA).notNull().default('activo'),
     fechaAlta: date('fecha_alta', { mode: 'string' }).notNull(),
     logoPath: varchar('logo_path', { length: 255 }),
     notas: text('notas'),
@@ -76,6 +79,7 @@ export const conexionesBd = mysqlTable('conexiones_bd', {
   sshUsuario: varchar('ssh_usuario', { length: 100 }),
   sshKeyPath: varchar('ssh_key_path', { length: 255 }),
   verificadaEn: datetime('verificada_en'),
+  estadoVerificacion: mysqlEnum('estado_verificacion', ESTADOS_VERIFICACION_BD),
   creadoEn,
   actualizadoEn,
 });

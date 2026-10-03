@@ -1,0 +1,19 @@
+# Reglas de Eficiencia de Tokens
+
+1. **Respuestas Concisas:** Responde únicamente con los bloques de código modificados o necesarios. No expliques conceptos básicos ni repitas todo el archivo si solo cambió una línea.
+2. **Optimización de Contexto:** No analices archivos completos si te paso una función específica. Solo revisa el archivo activo.
+3. **Confirmación de Cambios:** Antes de realizar refactorizaciones masivas en múltiples archivos en modo Agent/Composer, confirma qué archivos vas a tocar para no quemar tokens innecesariamente.
+
+
+# Reglas de Eficiencia para Next.js
+
+## Ahorro de Tokens
+- Sé extremadamente conciso. Muestra únicamente el código modificado o la función específica.
+- No expliques conceptos básicos ni repitas código no modificado.
+- Antes de hacer cambios en múltiples archivos, confirma conmigo qué vas a modificar.
+
+## Reglas del Proyecto (Next.js)
+- Adapta las respuestas al lenguaje del archivo actual: si es .js/.jsx usa JavaScript puro (ES6+); si es .ts/.tsx usa TypeScript estricto.
+- Respeta la arquitectura de Next.js (App Router con /app o Pages Router con /pages según el archivo abierto).
+- Mantén limpia la separación entre Client Components ('use client') y Server Components.
+- No incluyas librerías adicionales ni hagas refactorizaciones no solicitadas.

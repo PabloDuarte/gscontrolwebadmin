@@ -8,7 +8,12 @@ import { LogoEmpresa } from '@/components/brand-logo';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { DateSelect, Field, Input, Select, Textarea } from '@/components/ui/field';
-import { ESTADOS_EMPRESA, PASSWORD_ENMASCARADA, capitalizar } from '@/lib/dominio';
+import {
+  ESTADOS_EMPRESA,
+  PASSWORD_ENMASCARADA,
+  capitalizar,
+  type EstadoVerificacionBd,
+} from '@/lib/dominio';
 import { parsearTelefono } from '@/lib/empresa';
 import { formatearFecha } from '@/lib/utils';
 import {
@@ -25,6 +30,7 @@ export type ConexionVisible = {
   usuario: string;
   password?: string;
   verificadaEn?: string | Date | null;
+  estadoVerificacion?: EstadoVerificacionBd | null;
   /** False cuando los datos salen de la conexión de licenciamiento y aún no se guardan en la ficha. */
   guardada?: boolean;
 };
@@ -65,7 +71,7 @@ function camposIniciales(
     nombreComercial: (empresa?.nombreComercial ?? '').toUpperCase(),
     rfc: (empresa?.rfc ?? '').toUpperCase(),
     razonSocial: (empresa?.razonSocial ?? '').toUpperCase(),
-    estado: empresa?.estado ?? 'prospecto',
+    estado: empresa?.estado ?? 'activo',
     fechaAlta: empresa?.fechaAlta ?? hoy,
     contactoNombre: empresa?.contactoNombre ?? '',
     contactoEmail: empresa?.contactoEmail ?? '',
@@ -417,9 +423,11 @@ export function EmpresaForm({
                     Probar conexión
                   </Button>
                   <p className="text-sm text-muted-foreground">
-                    {conexion?.verificadaEn
-                      ? `Última prueba exitosa: ${formatearFecha(conexion.verificadaEn)}.`
-                      : 'Puedes probar los parámetros antes de guardar.'}
+                    {conexion?.estadoVerificacion === 'verificada' && conexion.verificadaEn
+                      ? `Verificada el ${formatearFecha(conexion.verificadaEn)}.`
+                      : conexion?.estadoVerificacion === 'no_existe' && conexion.verificadaEn
+                        ? `No existe. Última prueba el ${formatearFecha(conexion.verificadaEn)}.`
+                        : 'Puedes probar los parámetros antes de guardar.'}
                   </p>
                   {estadoPrueba?.mensaje ? (
                     <p

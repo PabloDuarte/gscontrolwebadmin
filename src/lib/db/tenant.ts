@@ -28,7 +28,13 @@ export async function conectarEmpresa(conexion: ConexionBd) {
 
 export type ResultadoPrueba =
   | { ok: true; version: string }
-  | { ok: false; mensaje: string };
+  | { ok: false; noExiste: boolean; mensaje: string };
+
+function baseNoExiste(error: unknown) {
+  if (!error || typeof error !== 'object') return false;
+  const fallo = error as { code?: string; errno?: number };
+  return fallo.code === 'ER_BAD_DB_ERROR' || fallo.errno === 1049;
+}
 
 /** Intenta conectarse a la base de la empresa y reporta el resultado. */
 export async function probarConexionEmpresa(conexion: ConexionBd): Promise<ResultadoPrueba> {
@@ -39,7 +45,13 @@ export async function probarConexionEmpresa(conexion: ConexionBd): Promise<Resul
     const [filas] = await cliente.query<mysql.RowDataPacket[]>('SELECT VERSION() AS version');
     return { ok: true, version: String(filas[0].version) };
   } catch (error) {
-    return { ok: false, mensaje: error instanceof Error ? error.message : 'Error desconocido' };
+    const noExiste = baseNoExiste(error);
+    const mensaje = error instanceof Error ? error.message : 'Error desconocido';
+    return {
+      ok: false,
+      noExiste,
+      mensaje: noExiste ? `La base ${conexion.nombreBd} no existe.` : mensaje,
+    };
   } finally {
     await cerrar?.();
   }

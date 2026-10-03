@@ -7,7 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input, Select } from '@/components/ui/field';
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
 import { listarEmpresas } from '@/lib/consultas';
-import { GuardadoModal } from './guardado-modal';
+import { FilaEmpresa } from './fila-empresa';
 import { ESTADOS_EMPRESA, TONO_EMPRESA, capitalizar, type EstadoEmpresa } from '@/lib/dominio';
 import { calcularVigencia, esSuscripcionVigente } from '@/lib/suscripciones';
 import { formatearFecha } from '@/lib/utils';
@@ -15,9 +15,9 @@ import { formatearFecha } from '@/lib/utils';
 export default async function EmpresasPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; estado?: string; guardado?: string }>;
+  searchParams: Promise<{ q?: string; estado?: string }>;
 }) {
-  const { q = '', estado = '', guardado = '' } = await searchParams;
+  const { q = '', estado = '' } = await searchParams;
   const todas = await listarEmpresas();
 
   const busqueda = q.trim().toLowerCase();
@@ -33,7 +33,6 @@ export default async function EmpresasPage({
 
   return (
     <>
-      <GuardadoModal visible={guardado === '1'} />
       <PageHeader
         titulo="Empresas"
         descripcion="Clientes registrados, su plan y la vigencia de su suscripción."
@@ -100,18 +99,20 @@ export default async function EmpresasPage({
                     suscripcion && vigente
                       ? calcularVigencia(suscripcion.fechaFin, suscripcion.estado)
                       : null;
-                  const resumenBd = conexion
-                    ? conexion.verificadaEn
-                      ? `${conexion.nombreBd} · verificada ${formatearFecha(conexion.verificadaEn)}`
-                      : `${conexion.nombreBd} · sin verificar`
-                    : 'Base de datos sin configurar';
+                  const verificacion =
+                    conexion?.estadoVerificacion === 'verificada'
+                      ? 'verificada'
+                      : conexion?.estadoVerificacion === 'no_existe'
+                        ? 'no existe'
+                        : null;
 
                   return (
-                    <TR key={empresa.id} className="relative cursor-pointer">
+                    <FilaEmpresa key={empresa.id} href={`/empresas/${empresa.id}`}>
                       <TD>
                         <Link
                           href={`/empresas/${empresa.id}`}
-                          className="block min-w-0 after:absolute after:inset-0"
+                          prefetch={false}
+                          className="block min-w-0"
                         >
                           <p className="truncate font-medium tracking-tight">
                             {empresa.nombreComercial}
@@ -121,17 +122,17 @@ export default async function EmpresasPage({
                           </p>
                         </Link>
                       </TD>
-                      <TD className="relative">
+                      <TD>
                         <Badge tono={TONO_EMPRESA[empresa.estado as EstadoEmpresa]}>
                           {capitalizar(empresa.estado)}
                         </Badge>
                       </TD>
-                      <TD className="relative font-medium">
+                      <TD className="font-medium">
                         {vigente
                           ? (suscripcion!.planNombre || plan?.nombre || 'Sin plan')
                           : 'Sin plan'}
                       </TD>
-                      <TD className="relative">
+                      <TD>
                         {vigencia ? (
                           <div className="space-y-1">
                             <Badge tono={vigencia.tono}>{vigencia.etiqueta}</Badge>
@@ -145,8 +146,30 @@ export default async function EmpresasPage({
                           </span>
                         )}
                       </TD>
-                      <TD className="relative text-xs text-muted-foreground">{resumenBd}</TD>
-                    </TR>
+                      <TD className="text-xs">
+                        {conexion ? (
+                          <div className="space-y-1">
+                            <p className="font-medium">{conexion.nombreBd}</p>
+                            {verificacion ? (
+                              <>
+                                <Badge tono={verificacion === 'verificada' ? 'exito' : 'peligro'}>
+                                  {verificacion}
+                                </Badge>
+                                {conexion.verificadaEn ? (
+                                  <p className="text-muted-foreground">
+                                    {formatearFecha(conexion.verificadaEn)}
+                                  </p>
+                                ) : null}
+                              </>
+                            ) : (
+                              <span className="text-muted-foreground">sin verificar</span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">Base de datos sin configurar</span>
+                        )}
+                      </TD>
+                    </FilaEmpresa>
                   );
                 })}
               </TBody>

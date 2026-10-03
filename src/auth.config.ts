@@ -14,8 +14,12 @@ export const authConfig = {
       const autenticado = Boolean(auth?.user);
       const enLogin = request.nextUrl.pathname.startsWith('/login');
 
+      if (request.nextUrl.pathname.startsWith('/recuperar')) return true;
+
       if (enLogin) {
-        return autenticado ? Response.redirect(new URL('/', request.nextUrl)) : true;
+        const cancelado = request.nextUrl.searchParams.get('cancelado') === '1';
+        if (autenticado && !cancelado) return Response.redirect(new URL('/', request.nextUrl));
+        return true;
       }
       return autenticado;
     },
