@@ -79,6 +79,7 @@ export function SuscripcionForm({
     setMoneda(elegido.moneda);
     setPeriodicidad(elegido.periodicidad);
     if (fechaInicio) setFechaFin(sumarMeses(fechaInicio, MESES[elegido.periodicidad]));
+    if (Number(elegido.precio) === 0) setPrecio('0');
   }
 
   const error = (campo: string) => estado?.errores?.[campo];

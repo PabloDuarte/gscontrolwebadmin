@@ -2,11 +2,11 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { eq } from 'drizzle-orm';
+import { eq, or } from 'drizzle-orm';
 import { z } from 'zod';
 import { auth } from '@/auth';
 import { db } from '@/lib/db/control';
-import { planes } from '@/lib/db/schema';
+import { planes, suscripciones } from '@/lib/db/schema';
 import { PERIODICIDADES } from '@/lib/dominio';
 
 export type EstadoFormulario = {
@@ -88,7 +88,22 @@ export async function guardarPlan(
 
   try {
     if (id) {
-      await db.update(planes).set(valores).where(eq(planes.id, id));
+      const [actual] = await db
+        .select({ codigo: planes.codigo })
+        .from(planes)
+        .where(eq(planes.id, id))
+        .limit(1);
+      if (!actual) return { mensaje: 'El plan no existe.' };
+
+      await db.transaction(async (tx) => {
+        await tx.update(planes).set(valores).where(eq(planes.id, id));
+        if (actual.codigo !== valores.codigo) {
+          await tx
+            .update(suscripciones)
+            .set({ planCodigo: valores.codigo })
+            .where(or(eq(suscripciones.planId, id), eq(suscripciones.planCodigo, actual.codigo)));
+        }
+      });
     } else {
       await db.insert(planes).values(valores);
     }
@@ -101,6 +116,7 @@ export async function guardarPlan(
   }
 
   revalidatePath('/planes');
+  revalidatePath('/empresas');
   revalidatePath('/');
   redirect('/planes');
 }
