@@ -136,7 +136,9 @@ export default async function TableroPage() {
                       <LogoEmpresa src={empresa.logoPath} alt={empresa.nombreComercial} />
                       <div className="min-w-0 flex-1">
                         <p className="truncate font-medium">{empresa.nombreComercial}</p>
-                        <p className="text-sm text-muted-foreground">{plan?.nombre ?? 'Sin plan'}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {suscripcion!.planNombre || plan?.nombre || 'Sin plan'}
+                        </p>
                       </div>
                       <div className="hidden items-center gap-2 sm:flex">
                         <Badge tono={TONO_EMPRESA[empresa.estado as EstadoEmpresa]}>

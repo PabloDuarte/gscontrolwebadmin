@@ -7,16 +7,17 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input, Select } from '@/components/ui/field';
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table';
 import { listarEmpresas } from '@/lib/consultas';
+import { GuardadoModal } from './guardado-modal';
 import { ESTADOS_EMPRESA, TONO_EMPRESA, capitalizar, type EstadoEmpresa } from '@/lib/dominio';
-import { calcularVigencia } from '@/lib/suscripciones';
+import { calcularVigencia, esSuscripcionVigente } from '@/lib/suscripciones';
 import { formatearFecha } from '@/lib/utils';
 
 export default async function EmpresasPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; estado?: string }>;
+  searchParams: Promise<{ q?: string; estado?: string; guardado?: string }>;
 }) {
-  const { q = '', estado = '' } = await searchParams;
+  const { q = '', estado = '', guardado = '' } = await searchParams;
   const todas = await listarEmpresas();
 
   const busqueda = q.trim().toLowerCase();
@@ -32,6 +33,7 @@ export default async function EmpresasPage({
 
   return (
     <>
+      <GuardadoModal visible={guardado === '1'} />
       <PageHeader
         titulo="Empresas"
         descripcion="Clientes registrados, su plan y la vigencia de su suscripción."
@@ -92,10 +94,12 @@ export default async function EmpresasPage({
                 </TR>
               </THead>
               <TBody>
-                {filas.map(({ empresa, conexion, suscripcion, plan }) => {
-                  const vigencia = suscripcion
-                    ? calcularVigencia(suscripcion.fechaFin, suscripcion.estado)
-                    : null;
+                {filas.map(({ empresa, conexion, suscripcion, plan, requiereRenovacion }) => {
+                  const vigente = suscripcion ? esSuscripcionVigente(suscripcion) : false;
+                  const vigencia =
+                    suscripcion && vigente
+                      ? calcularVigencia(suscripcion.fechaFin, suscripcion.estado)
+                      : null;
                   const resumenBd = conexion
                     ? conexion.verificadaEn
                       ? `${conexion.nombreBd} · verificada ${formatearFecha(conexion.verificadaEn)}`
@@ -122,7 +126,11 @@ export default async function EmpresasPage({
                           {capitalizar(empresa.estado)}
                         </Badge>
                       </TD>
-                      <TD className="relative font-medium">{plan?.nombre ?? 'Sin plan'}</TD>
+                      <TD className="relative font-medium">
+                        {vigente
+                          ? (suscripcion!.planNombre || plan?.nombre || 'Sin plan')
+                          : 'Sin plan'}
+                      </TD>
                       <TD className="relative">
                         {vigencia ? (
                           <div className="space-y-1">
@@ -132,7 +140,9 @@ export default async function EmpresasPage({
                             </p>
                           </div>
                         ) : (
-                          <span className="text-muted-foreground">Sin suscripción</span>
+                          <span className="text-muted-foreground">
+                            {requiereRenovacion ? 'Sin suscripción — renovar' : 'Sin suscripción'}
+                          </span>
                         )}
                       </TD>
                       <TD className="relative text-xs text-muted-foreground">{resumenBd}</TD>

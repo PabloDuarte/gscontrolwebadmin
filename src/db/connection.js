@@ -117,4 +117,4 @@ export async function withConnection(fn) {
   }
 }
 
-export { config };
+export { config, openTunnel };

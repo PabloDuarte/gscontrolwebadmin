@@ -2,11 +2,11 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { and, eq, inArray, ne, sql } from 'drizzle-orm';
+import { and, eq, ne, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { auth } from '@/auth';
 import { db } from '@/lib/db/control';
-import { conexionesBd, empresas, suscripciones, type ConexionBd } from '@/lib/db/schema';
+import { conexionesBd, empresas, planes, suscripciones, type ConexionBd } from '@/lib/db/schema';
 import { probarConexionEmpresa } from '@/lib/db/tenant';
 import { cifrar } from '@/lib/crypto';
 import {
@@ -20,7 +20,8 @@ import {
   normalizarRfc,
   validarTelefonoPartes,
 } from '@/lib/empresa';
-import { esSuscripcionEnCurso } from '@/lib/suscripciones';
+import { esSuscripcionVigente } from '@/lib/suscripciones';
+import { cerrarSuscripcionesVencidas } from '@/lib/suscripciones-vencimiento';
 import { borrarLogoEmpresa, guardarLogoEmpresa, validarLogo } from '@/lib/uploads';
 
 export type EstadoFormulario = {
@@ -45,8 +46,13 @@ const opcional = (max: number) =>
     .transform((v) => (v ? v : null));
 
 const esquemaEmpresa = z.object({
-  nombreComercial: z.string().trim().min(2, 'Requerido').max(150),
-  razonSocial: opcional(200),
+  nombreComercial: z
+    .string()
+    .trim()
+    .min(2, 'Requerido')
+    .max(150)
+    .transform((v) => v.toUpperCase()),
+  razonSocial: opcional(200).transform((v) => (v ? v.toUpperCase() : null)),
   rfc: z
     .string()
     .trim()
@@ -69,16 +75,12 @@ const esquemaConexion = z.object({
     .trim()
     .min(1, 'Requerido')
     .max(64)
-    .regex(/^[A-Za-z0-9_]+$/, 'Sólo letras, números y guion bajo'),
+    .transform((v) => v.toUpperCase())
+    .refine((v) => /^[A-Z0-9_]+$/.test(v), 'Sólo letras, números y guion bajo'),
   host: z.string().trim().min(1, 'Requerido').max(255),
   puerto: z.coerce.number().int().min(1).max(65535),
   usuario: z.string().trim().min(1, 'Requerido').max(100),
   password: z.string(),
-  usaTunelSsh: z.coerce.boolean(),
-  sshHost: opcional(255),
-  sshPuerto: z.coerce.number().int().min(1).max(65535).optional(),
-  sshUsuario: opcional(100),
-  sshKeyPath: opcional(255),
 });
 
 function aplanarErrores(error: z.ZodError): Record<string, string> {
@@ -114,13 +116,11 @@ export async function guardarEmpresa(
   const crudo = leer(datos);
   const id = crudo.id ? Number(crudo.id) : null;
   const esAlta = !id;
-  // Conexión solo en ficha (edición), nunca en el alta.
-  const capturaConexion = !esAlta && crudo.configurarConexion === 'on';
+  // Conexión solo en ficha (edición), nunca en el alta. Vacía = todavía no se configura.
+  const capturaConexion = !esAlta && Boolean(crudo.nombreBd?.trim());
 
   const empresaAnalizada = esquemaEmpresa.safeParse(crudo);
-  const conexionAnalizada = capturaConexion
-    ? esquemaConexion.safeParse({ ...crudo, usaTunelSsh: crudo.usaTunelSsh === 'on' })
-    : null;
+  const conexionAnalizada = capturaConexion ? esquemaConexion.safeParse(crudo) : null;
 
   const erroresTel = validarTelefonoPartes({
     pais: crudo.telefonoPais ?? '',
@@ -232,11 +232,11 @@ export async function guardarEmpresa(
         host: c.host,
         puerto: c.puerto,
         usuario: c.usuario,
-        usaTunelSsh: c.usaTunelSsh,
-        sshHost: c.sshHost,
-        sshPuerto: c.sshPuerto ?? 22,
-        sshUsuario: c.sshUsuario,
-        sshKeyPath: c.sshKeyPath,
+        usaTunelSsh: false,
+        sshHost: null,
+        sshPuerto: null,
+        sshUsuario: null,
+        sshKeyPath: null,
       };
 
       if (existente) {
@@ -255,10 +255,7 @@ export async function guardarEmpresa(
   revalidatePath('/empresas');
   revalidatePath('/');
   revalidatePath(`/empresas/${empresaId}`);
-  if (esAlta) {
-    redirect('/empresas');
-  }
-  redirect(`/empresas/${empresaId}`);
+  redirect('/empresas?guardado=1');
 }
 
 export async function eliminarEmpresa(datos: FormData) {
@@ -317,10 +314,7 @@ export async function probarConexionDesdeFormulario(
   await exigirSesion();
 
   const crudo = leer(datos);
-  const analisis = esquemaConexion.safeParse({
-    ...crudo,
-    usaTunelSsh: crudo.usaTunelSsh === 'on',
-  });
+  const analisis = esquemaConexion.safeParse(crudo);
 
   if (!analisis.success) {
     return { ok: false, mensaje: 'Completa los datos de conexión antes de probar.', errores: aplanarErrores(analisis.error) };
@@ -344,11 +338,11 @@ export async function probarConexionDesdeFormulario(
         puerto: c.puerto,
         nombreBd: c.nombreBd,
         usuario: c.usuario,
-        usaTunelSsh: c.usaTunelSsh,
-        sshHost: c.sshHost,
-        sshPuerto: c.sshPuerto ?? 22,
-        sshUsuario: c.sshUsuario,
-        sshKeyPath: c.sshKeyPath,
+        usaTunelSsh: false,
+        sshHost: null,
+        sshPuerto: null,
+        sshUsuario: null,
+        sshKeyPath: null,
       };
       const resultado = await probarConexionEmpresa(temporal);
       if (resultado.ok) {
@@ -370,11 +364,11 @@ export async function probarConexionDesdeFormulario(
     nombreBd: c.nombreBd,
     usuario: c.usuario,
     passwordCifrado: cifrar(passwordPlana),
-    usaTunelSsh: c.usaTunelSsh,
-    sshHost: c.sshHost,
-    sshPuerto: c.sshPuerto ?? 22,
-    sshUsuario: c.sshUsuario,
-    sshKeyPath: c.sshKeyPath,
+    usaTunelSsh: false,
+    sshHost: null,
+    sshPuerto: null,
+    sshUsuario: null,
+    sshKeyPath: null,
     verificadaEn: null,
     creadoEn: new Date(),
     actualizadoEn: new Date(),
@@ -421,34 +415,54 @@ export async function guardarSuscripcion(
     return { errores: { fechaFin: 'Debe ser posterior al inicio' } };
   }
 
-  if (valores.estado === 'cancelada') {
-    return { errores: { estado: 'Crea la suscripción activa; cancélala después si hace falta' } };
+  if (valores.estado === 'cancelada' || valores.estado === 'vencida') {
+    return {
+      errores: {
+        estado: 'El alta solo admite activa, o prueba si es la primera suscripción de la empresa.',
+      },
+    };
   }
 
   try {
-    if (esSuscripcionEnCurso(valores.estado)) {
-      const existentes = await db
-        .select({ id: suscripciones.id })
-        .from(suscripciones)
-        .where(
-          and(
-            eq(suscripciones.empresaId, valores.empresaId),
-            inArray(suscripciones.estado, ['activa', 'prueba']),
-          ),
-        )
-        .limit(1);
+    await cerrarSuscripcionesVencidas(valores.empresaId);
 
-      if (existentes.length > 0) {
-        return {
-          mensaje:
-            'Esta empresa ya tiene una suscripción activa. Cancélala antes de asignar un plan nuevo.',
-        };
-      }
+    const [empresa] = await db
+      .select({ id: empresas.id })
+      .from(empresas)
+      .where(eq(empresas.id, valores.empresaId))
+      .limit(1);
+    if (!empresa) return { mensaje: 'La empresa no existe.' };
+
+    const filas = await db
+      .select()
+      .from(suscripciones)
+      .where(eq(suscripciones.empresaId, valores.empresaId));
+
+    if (filas.some((s) => esSuscripcionVigente(s))) {
+      return {
+        mensaje:
+          'Hay una suscripción vigente; no se puede dar de alta otra hasta que venza o la canceles.',
+      };
     }
+
+    if (filas.length > 0 && valores.estado === 'prueba') {
+      return {
+        errores: { estado: 'La prueba solo aplica a la primera suscripción de la empresa.' },
+      };
+    }
+
+    const [plan] = await db
+      .select({ nombre: planes.nombre, codigo: planes.codigo })
+      .from(planes)
+      .where(eq(planes.id, valores.planId))
+      .limit(1);
+    if (!plan) return { errores: { planId: 'El plan no existe' } };
 
     await db.insert(suscripciones).values({
       ...valores,
       precio: valores.precio.toFixed(2),
+      planNombre: plan.nombre,
+      planCodigo: plan.codigo,
     });
   } catch (error) {
     return { mensaje: mensajeDeError(error) };
@@ -459,7 +473,7 @@ export async function guardarSuscripcion(
   revalidatePath('/');
   return {
     ok: true,
-    mensaje: 'Suscripción asignada. Si había una cancelada, queda en el historial.',
+    mensaje: 'Suscripción creada. El ciclo anterior, si lo había, queda en el historial.',
   };
 }
 
@@ -472,6 +486,8 @@ export async function cancelarSuscripcion(datos: FormData): Promise<void> {
     throw new Error('Datos no válidos');
   }
 
+  await cerrarSuscripcionesVencidas(empresaId);
+
   const [fila] = await db
     .select()
     .from(suscripciones)
@@ -479,8 +495,8 @@ export async function cancelarSuscripcion(datos: FormData): Promise<void> {
     .limit(1);
 
   if (!fila) throw new Error('Suscripción no encontrada');
-  if (!esSuscripcionEnCurso(fila.estado)) {
-    throw new Error('Solo se puede cancelar una suscripción activa o en prueba');
+  if (!esSuscripcionVigente(fila)) {
+    throw new Error('Solo se puede cancelar una suscripción vigente');
   }
 
   await db

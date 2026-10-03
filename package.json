@@ -9,7 +9,7 @@
     "build": "next build",
     "start": "next start",
     "check-db": "node scripts/check-db.js",
-    "tunnel": "bash scripts/tunnel.sh",
+    "tunnel": "node scripts/tunnel.js",
     "db:create": "node scripts/create-control-db.js",
     "db:push": "drizzle-kit push",
     "db:seed": "tsx scripts/seed.ts"

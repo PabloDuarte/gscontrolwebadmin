@@ -4,6 +4,7 @@ import { ConfirmSubmit } from '@/components/confirm-submit';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { TBody, TD, TH, THead, TR, Table } from '@/components/ui/table';
+import { descifrar } from '@/lib/crypto';
 import { obtenerEmpresa } from '@/lib/consultas';
 import {
   ETIQUETA_PERIODICIDAD,
@@ -14,7 +15,8 @@ import {
   type EstadoSuscripcion,
   type Periodicidad,
 } from '@/lib/dominio';
-import { calcularVigencia, esSuscripcionEnCurso } from '@/lib/suscripciones';
+import { obtenerConexionLicenciamiento, sugerirBase } from '@/lib/licenciamiento';
+import { calcularVigencia, esSuscripcionVigente } from '@/lib/suscripciones';
 import { formatearFecha, formatearMoneda } from '@/lib/utils';
 import { cancelarSuscripcion, eliminarEmpresa } from '../actions';
 import { EmpresaForm } from '../empresa-form';
@@ -33,16 +35,55 @@ export default async function EmpresaDetallePage({
   if (!datos) notFound();
 
   const { empresa, conexion, suscripciones, planes } = datos;
-  const enCurso = suscripciones.find((s) => esSuscripcionEnCurso(s.estado)) ?? null;
+  const enCurso = suscripciones.find((s) => esSuscripcionVigente(s)) ?? null;
   const historial = suscripciones.filter((s) => !enCurso || s.id !== enCurso.id);
-  const planEnCurso = enCurso ? planes.find((p) => p.id === enCurso.planId) : null;
+  const ultima = enCurso ? null : (suscripciones[0] ?? null);
+  const nombrePlan = (s: (typeof suscripciones)[number]) =>
+    s.planNombre || planes.find((p) => p.id === s.planId)?.nombre || String(s.planId);
   const vigencia = enCurso ? calcularVigencia(enCurso.fechaFin, enCurso.estado) : null;
+  let passwordConexion = '';
+  if (conexion) {
+    try {
+      passwordConexion = descifrar(conexion.passwordCifrado);
+    } catch {
+      passwordConexion = '';
+    }
+  }
+
+  const lic = conexion ? null : await obtenerConexionLicenciamiento();
+  const conexionVisible = conexion
+    ? {
+        nombreBd: conexion.nombreBd,
+        host: conexion.host,
+        puerto: conexion.puerto,
+        usuario: conexion.usuario,
+        password: passwordConexion,
+        verificadaEn: conexion.verificadaEn,
+        guardada: true,
+      }
+    : {
+        nombreBd: sugerirBase(empresa.nombreComercial, lic?.bases ?? []),
+        host: lic?.dbHost ?? '127.0.0.1',
+        puerto: lic?.dbPuerto ?? 3306,
+        usuario: lic?.dbUsuario ?? '',
+        password: lic?.dbPassword ?? '',
+        verificadaEn: null,
+        guardada: false,
+      };
 
   return (
     <>
       <PageHeader
         titulo={empresa.nombreComercial}
-        descripcion={empresa.rfc ?? ''}
+        descripcion={[
+          empresa.rfc,
+          enCurso ? `Plan ${nombrePlan(enCurso)} hasta ${formatearFecha(enCurso.fechaFin)}` : null,
+          conexionVisible.nombreBd
+            ? `Base ${conexionVisible.nombreBd} · ${conexionVisible.usuario}@${conexionVisible.host}:${conexionVisible.puerto}`
+            : null,
+        ]
+          .filter(Boolean)
+          .join(' · ')}
         acciones={
           <Badge tono={TONO_EMPRESA[empresa.estado as EstadoEmpresa]}>
             {capitalizar(empresa.estado)}
@@ -52,22 +93,7 @@ export default async function EmpresaDetallePage({
 
       <EmpresaForm
         empresa={{ ...empresa, rfc: empresa.rfc ?? '' }}
-        conexion={
-          conexion
-            ? {
-                nombreBd: conexion.nombreBd,
-                host: conexion.host,
-                puerto: conexion.puerto,
-                usuario: conexion.usuario,
-                usaTunelSsh: conexion.usaTunelSsh,
-                sshHost: conexion.sshHost,
-                sshPuerto: conexion.sshPuerto,
-                sshUsuario: conexion.sshUsuario,
-                sshKeyPath: conexion.sshKeyPath,
-                verificadaEn: conexion.verificadaEn,
-              }
-            : null
-        }
+        conexion={conexionVisible}
       />
 
       <Card>
@@ -75,8 +101,10 @@ export default async function EmpresaDetallePage({
           <CardTitle>Suscripción</CardTitle>
           <CardDescription>
             {enCurso && vigencia
-              ? `${vigencia.etiqueta}. Plan vigente hasta ${formatearFecha(enCurso.fechaFin)}. Para cambiar de plan, cancela esta y asigna una nueva.`
-              : 'Asigna un plan y una vigencia. Solo puede haber una suscripción activa a la vez.'}
+              ? `${vigencia.etiqueta}. Vigente hasta ${formatearFecha(enCurso.fechaFin)}. No se edita; al vencer se cierra y podrás crear el siguiente ciclo.`
+              : ultima
+                ? 'La suscripción anterior ya no está vigente. Elige un plan y captura el precio del siguiente ciclo.'
+                : 'Primera suscripción de esta empresa. La prueba solo está disponible en este alta.'}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -87,7 +115,7 @@ export default async function EmpresaDetallePage({
                   <dt className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
                     Plan
                   </dt>
-                  <dd className="mt-1 text-sm font-medium">{planEnCurso?.nombre ?? enCurso.planId}</dd>
+                  <dd className="mt-1 text-sm font-medium">{nombrePlan(enCurso)}</dd>
                 </div>
                 <div>
                   <dt className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
@@ -134,19 +162,22 @@ export default async function EmpresaDetallePage({
               <form action={cancelarSuscripcion}>
                 <input type="hidden" name="empresaId" value={empresa.id} />
                 <input type="hidden" name="suscripcionId" value={enCurso.id} />
-                <ConfirmSubmit mensaje="¿Cancelar esta suscripción? Podrás asignar un plan nuevo después. La cancelada quedará en el historial.">
+                <ConfirmSubmit mensaje="¿Cancelar esta suscripción vigente? Quedará en el historial y podrás crear un ciclo nuevo.">
                   Cancelar suscripción
                 </ConfirmSubmit>
               </form>
             </div>
           ) : (
             <SuscripcionForm
+              key={empresa.id}
               empresaId={empresa.id}
+              permitePrueba={suscripciones.length === 0}
               planes={planes.map((p) => ({
                 id: p.id,
                 nombre: p.nombre,
                 precio: p.precio,
                 moneda: p.moneda,
+                periodicidad: p.periodicidad as Periodicidad,
               }))}
             />
           )}
@@ -173,10 +204,9 @@ export default async function EmpresaDetallePage({
               <TBody>
                 {historial.map((s) => {
                   const v = calcularVigencia(s.fechaFin, s.estado);
-                  const plan = planes.find((p) => p.id === s.planId);
                   return (
                     <TR key={s.id}>
-                      <TD>{plan?.nombre ?? s.planId}</TD>
+                      <TD>{nombrePlan(s)}</TD>
                       <TD>
                         <Badge tono={TONO_SUSCRIPCION[s.estado as EstadoSuscripcion]}>
                           {capitalizar(s.estado)}

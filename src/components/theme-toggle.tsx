@@ -9,10 +9,10 @@ export function ThemeToggle() {
   const { resolvedTheme, setTheme } = useTheme();
   const [montado, setMontado] = useState(false);
 
-  // El tema real solo se conoce en el cliente; sin esto el icono parpadea.
+  // El tema resuelto solo existe en el cliente. Hasta montar, el botón queda igual que en el HTML del servidor.
   useEffect(() => setMontado(true), []);
 
-  const oscuro = resolvedTheme === 'dark';
+  const oscuro = montado && resolvedTheme === 'dark';
 
   return (
     <Button
@@ -21,7 +21,7 @@ export function ThemeToggle() {
       aria-label={oscuro ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'}
       onClick={() => setTheme(oscuro ? 'light' : 'dark')}
     >
-      {montado && oscuro ? <Sun /> : <Moon />}
+      {oscuro ? <Sun /> : <Moon />}
     </Button>
   );
 }

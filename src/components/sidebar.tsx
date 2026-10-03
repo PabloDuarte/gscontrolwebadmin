@@ -2,13 +2,14 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Building2, LayoutDashboard, Tags } from 'lucide-react';
+import { Building2, Cable, LayoutDashboard, Tags } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const enlaces = [
   { href: '/', etiqueta: 'Tablero', icono: LayoutDashboard },
   { href: '/empresas', etiqueta: 'Empresas', icono: Building2 },
   { href: '/planes', etiqueta: 'Planes', icono: Tags },
+  { href: '/conexion', etiqueta: 'Conexión', icono: Cable },
 ];
 
 export function Sidebar() {
@@ -25,8 +26,8 @@ export function Sidebar() {
             className={cn(
               'flex items-center gap-3 rounded-full px-3.5 py-2.5 text-sm font-medium transition-all duration-200 ease-apple',
               activo
-                ? 'bg-[#1d1d1f] text-white shadow-apple dark:bg-white dark:text-black'
-                : 'text-muted-foreground hover:bg-black/5 hover:text-foreground dark:hover:bg-white/10',
+                ? 'bg-white text-black shadow-apple'
+                : 'text-white/55 hover:bg-white/10 hover:text-white',
             )}
           >
             <Icono className="size-4" />

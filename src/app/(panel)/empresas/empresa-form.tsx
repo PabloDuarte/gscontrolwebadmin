@@ -3,11 +3,11 @@
 import { useActionState, useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { useFormStatus } from 'react-dom';
 import Link from 'next/link';
-import { AlertCircle, CheckCircle2, PlugZap, XCircle } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Eye, EyeOff, PlugZap, XCircle } from 'lucide-react';
 import { LogoEmpresa } from '@/components/brand-logo';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Field, Input, Select, Textarea } from '@/components/ui/field';
+import { DateSelect, Field, Input, Select, Textarea } from '@/components/ui/field';
 import { ESTADOS_EMPRESA, PASSWORD_ENMASCARADA, capitalizar } from '@/lib/dominio';
 import { parsearTelefono } from '@/lib/empresa';
 import { formatearFecha } from '@/lib/utils';
@@ -17,18 +17,16 @@ import {
   type EstadoFormulario,
 } from './actions';
 
-/** Datos de conexion sin la contrasena, que nunca sale del servidor. */
+/** Datos de conexion. La contraseña se descifra en el servidor para poder verla. */
 export type ConexionVisible = {
   nombreBd: string;
   host: string;
   puerto: number;
   usuario: string;
-  usaTunelSsh: boolean;
-  sshHost: string | null;
-  sshPuerto: number | null;
-  sshUsuario: string | null;
-  sshKeyPath: string | null;
+  password?: string;
   verificadaEn?: string | Date | null;
+  /** False cuando los datos salen de la conexión de licenciamiento y aún no se guardan en la ficha. */
+  guardada?: boolean;
 };
 
 export type EmpresaVisible = {
@@ -64,9 +62,9 @@ function camposIniciales(
   const hoy = new Date().toISOString().slice(0, 10);
   const telefono = parsearTelefono(empresa?.contactoTelefono);
   return {
-    nombreComercial: empresa?.nombreComercial ?? '',
-    rfc: empresa?.rfc ?? '',
-    razonSocial: empresa?.razonSocial ?? '',
+    nombreComercial: (empresa?.nombreComercial ?? '').toUpperCase(),
+    rfc: (empresa?.rfc ?? '').toUpperCase(),
+    razonSocial: (empresa?.razonSocial ?? '').toUpperCase(),
     estado: empresa?.estado ?? 'prospecto',
     fechaAlta: empresa?.fechaAlta ?? hoy,
     contactoNombre: empresa?.contactoNombre ?? '',
@@ -75,15 +73,11 @@ function camposIniciales(
     telefonoArea: telefono.area,
     telefonoNumero: telefono.numero,
     notas: empresa?.notas ?? '',
-    nombreBd: conexion?.nombreBd ?? '',
+    nombreBd: (conexion?.nombreBd ?? '').toUpperCase(),
     usuario: conexion?.usuario ?? '',
     host: conexion?.host ?? '127.0.0.1',
     puerto: String(conexion?.puerto ?? 3306),
-    password: conexion ? PASSWORD_ENMASCARADA : '',
-    sshHost: conexion?.sshHost ?? '',
-    sshPuerto: String(conexion?.sshPuerto ?? 22),
-    sshUsuario: conexion?.sshUsuario ?? '',
-    sshKeyPath: conexion?.sshKeyPath ?? '',
+    password: conexion?.password || (conexion ? PASSWORD_ENMASCARADA : ''),
   };
 }
 
@@ -97,8 +91,7 @@ export function EmpresaForm({
   const logoRef = useRef<File | null>(null);
   const [vistaPrevia, setVistaPrevia] = useState<string | null>(empresa?.logoPath ?? null);
   const [campos, setCampos] = useState<Campos>(() => camposIniciales(empresa, conexion));
-  const [configurarConexion, setConfigurarConexion] = useState(() => Boolean(conexion));
-  const [usaTunel, setUsaTunel] = useState(() => conexion?.usaTunelSsh ?? false);
+  const [verPassword, setVerPassword] = useState(true);
 
   const [estado, accion] = useActionState<EstadoFormulario | undefined, FormData>(
     async (previo, datos) => {
@@ -124,6 +117,11 @@ export function EmpresaForm({
     (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
       setCampos((prev) => ({ ...prev, [nombre]: e.target.value }));
     };
+  const setCampoMayus =
+    (nombre: string) =>
+    (e: ChangeEvent<HTMLInputElement>) => {
+      setCampos((prev) => ({ ...prev, [nombre]: e.target.value.toUpperCase() }));
+    };
 
   useEffect(() => {
     if (!estado?.errores) return;
@@ -141,8 +139,6 @@ export function EmpresaForm({
   useEffect(() => {
     if (!estado?.valores) return;
     setCampos((prev) => ({ ...prev, ...estado.valores }));
-    setConfigurarConexion(estado.valores.configurarConexion === 'on');
-    setUsaTunel(estado.valores.usaTunelSsh === 'on');
   }, [estado?.valores]);
 
   return (
@@ -151,19 +147,34 @@ export function EmpresaForm({
       {empresa ? <input type="hidden" name="empresaId" value={empresa.id} /> : null}
 
       <Card>
-        <CardHeader>
-          <CardTitle>Datos de la empresa</CardTitle>
-          <CardDescription>
-            Particulares del cliente. El RFC / ID fiscal es el identificador único.
-          </CardDescription>
+        <CardHeader className="flex-row items-start justify-between gap-4 space-y-0">
+          <div className="space-y-1.5">
+            <CardTitle>Datos de la empresa</CardTitle>
+            <CardDescription>
+              Particulares del cliente. El RFC / ID fiscal es el identificador único.
+            </CardDescription>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <Guardar />
+            <Link href="/empresas" className={buttonVariants({ variant: 'ghost' })}>
+              Cancelar
+            </Link>
+          </div>
         </CardHeader>
+        {estado?.mensaje && !estado.ok ? (
+          <p className="mx-6 mb-4 flex items-center gap-2 rounded-2xl bg-destructive/10 px-3.5 py-2.5 text-sm text-destructive">
+            <AlertCircle className="size-4 shrink-0" />
+            {estado.mensaje}
+          </p>
+        ) : null}
         <CardContent className="grid gap-4 sm:grid-cols-2">
           <Field label="Nombre comercial" htmlFor="nombreComercial" error={error('nombreComercial')}>
             <Input
               id="nombreComercial"
               name="nombreComercial"
               value={campos.nombreComercial}
-              onChange={setCampo('nombreComercial')}
+              onChange={setCampoMayus('nombreComercial')}
+              className="uppercase"
               required
             />
           </Field>
@@ -178,7 +189,7 @@ export function EmpresaForm({
               id="rfc"
               name="rfc"
               value={campos.rfc}
-              onChange={setCampo('rfc')}
+              onChange={setCampoMayus('rfc')}
               required
               maxLength={13}
               className="uppercase"
@@ -190,7 +201,8 @@ export function EmpresaForm({
               id="razonSocial"
               name="razonSocial"
               value={campos.razonSocial}
-              onChange={setCampo('razonSocial')}
+              onChange={setCampoMayus('razonSocial')}
+              className="uppercase"
             />
           </Field>
 
@@ -210,12 +222,11 @@ export function EmpresaForm({
           </Field>
 
           <Field label="Fecha de alta" htmlFor="fechaAlta" error={error('fechaAlta')}>
-            <Input
+            <DateSelect
               id="fechaAlta"
               name="fechaAlta"
-              type="date"
               value={campos.fechaAlta}
-              onChange={setCampo('fechaAlta')}
+              onChange={(fechaAlta) => setCampos((prev) => ({ ...prev, fechaAlta }))}
               required
             />
           </Field>
@@ -324,31 +335,22 @@ export function EmpresaForm({
           <CardHeader>
             <CardTitle>Base de datos de la empresa</CardTitle>
             <CardDescription>
-              Parámetros con los que el sistema se conectará a su base. La contraseña se guarda
-              cifrada.
+              {conexion?.guardada === false
+                ? 'Tomados de la conexión de licenciamiento y de la base que ya existe en el servidor. La prueba usa el túnel que está corriendo en la terminal.'
+                : conexion
+                  ? `Guardada: ${conexion.nombreBd} · ${conexion.usuario}@${conexion.host}:${conexion.puerto}. La prueba usa el túnel de licenciamiento.`
+                  : 'Conexión directa a MySQL. La prueba usa el túnel de licenciamiento que está corriendo en la terminal.'}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <label className="flex items-center gap-2.5 text-sm">
-              <input
-                type="checkbox"
-                name="configurarConexion"
-                className="size-4 rounded-md border-input accent-primary"
-                checked={configurarConexion}
-                onChange={(e) => setConfigurarConexion(e.target.checked)}
-                value="on"
-              />
-              Configurar la conexión a su base de datos
-            </label>
-
-            {configurarConexion ? (
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Nombre de la base" htmlFor="nombreBd" error={error('nombreBd')}>
                   <Input
                     id="nombreBd"
                     name="nombreBd"
                     value={campos.nombreBd}
-                    onChange={setCampo('nombreBd')}
+                    onChange={setCampoMayus('nombreBd')}
+                    className="uppercase"
                   />
                 </Field>
 
@@ -379,72 +381,29 @@ export function EmpresaForm({
                   label="Contraseña"
                   htmlFor="password"
                   error={error('password')}
-                  hint={
-                    conexion
-                      ? 'Los puntos son la contraseña guardada. Cámbiala sólo si quieres reemplazarla.'
-                      : undefined
-                  }
+                  hint="Visible para revisarla. El ojo la oculta."
                   className="sm:col-span-2"
                 >
-                  <Input
-                    id="password"
-                    name="password"
-                    type="password"
-                    autoComplete="new-password"
-                    value={campos.password}
-                    onChange={setCampo('password')}
-                  />
+                  <div className="relative">
+                    <Input
+                      id="password"
+                      name="password"
+                      type={verPassword ? 'text' : 'password'}
+                      autoComplete="new-password"
+                      value={campos.password}
+                      onChange={setCampo('password')}
+                      className="pr-12"
+                    />
+                    <button
+                      type="button"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
+                      onClick={() => setVerPassword((v) => !v)}
+                      aria-label={verPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
+                    >
+                      {verPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                    </button>
+                  </div>
                 </Field>
-
-                <label className="flex items-center gap-2.5 text-sm sm:col-span-2">
-                  <input
-                    type="checkbox"
-                    name="usaTunelSsh"
-                    className="size-4 rounded-md border-input accent-primary"
-                    checked={usaTunel}
-                    onChange={(e) => setUsaTunel(e.target.checked)}
-                    value="on"
-                  />
-                  Su base vive en otro servidor y requiere túnel SSH
-                </label>
-
-                {usaTunel ? (
-                  <>
-                    <Field label="Host SSH" htmlFor="sshHost" error={error('sshHost')}>
-                      <Input
-                        id="sshHost"
-                        name="sshHost"
-                        value={campos.sshHost}
-                        onChange={setCampo('sshHost')}
-                      />
-                    </Field>
-                    <Field label="Puerto SSH" htmlFor="sshPuerto" error={error('sshPuerto')}>
-                      <Input
-                        id="sshPuerto"
-                        name="sshPuerto"
-                        type="number"
-                        value={campos.sshPuerto}
-                        onChange={setCampo('sshPuerto')}
-                      />
-                    </Field>
-                    <Field label="Usuario SSH" htmlFor="sshUsuario" error={error('sshUsuario')}>
-                      <Input
-                        id="sshUsuario"
-                        name="sshUsuario"
-                        value={campos.sshUsuario}
-                        onChange={setCampo('sshUsuario')}
-                      />
-                    </Field>
-                    <Field label="Ruta de la llave" htmlFor="sshKeyPath" error={error('sshKeyPath')}>
-                      <Input
-                        id="sshKeyPath"
-                        name="sshKeyPath"
-                        value={campos.sshKeyPath}
-                        onChange={setCampo('sshKeyPath')}
-                      />
-                    </Field>
-                  </>
-                ) : null}
 
                 <div className="flex flex-wrap items-center gap-3 border-t border-black/5 pt-4 sm:col-span-2 dark:border-white/10">
                   <Button
@@ -480,38 +439,10 @@ export function EmpresaForm({
                   ) : null}
                 </div>
               </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Puedes capturarla después, cuando la base de la empresa esté lista.
-              </p>
-            )}
           </CardContent>
         </Card>
       ) : null}
 
-      {estado?.mensaje ? (
-        <p
-          className={`flex items-center gap-2 rounded-2xl px-3.5 py-2.5 text-sm ${
-            estado.ok
-              ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
-              : 'bg-destructive/10 text-destructive'
-          }`}
-        >
-          {estado.ok ? (
-            <CheckCircle2 className="size-4 shrink-0" />
-          ) : (
-            <AlertCircle className="size-4 shrink-0" />
-          )}
-          {estado.mensaje}
-        </p>
-      ) : null}
-
-      <div className="flex items-center gap-2">
-        <Guardar />
-        <Link href="/empresas" className={buttonVariants({ variant: 'ghost' })}>
-          Cancelar
-        </Link>
-      </div>
     </form>
   );
 }

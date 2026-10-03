@@ -106,6 +106,8 @@ export const suscripciones = mysqlTable(
     planId: int('plan_id')
       .notNull()
       .references(() => planes.id),
+    planNombre: varchar('plan_nombre', { length: 120 }).notNull().default(''),
+    planCodigo: varchar('plan_codigo', { length: 40 }),
     estado: mysqlEnum('estado', ESTADOS_SUSCRIPCION).notNull().default('activa'),
     fechaInicio: date('fecha_inicio', { mode: 'string' }).notNull(),
     fechaFin: date('fecha_fin', { mode: 'string' }).notNull(),

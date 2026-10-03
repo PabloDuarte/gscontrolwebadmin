@@ -12,20 +12,36 @@ export type Vigencia = {
   tono: 'neutro' | 'exito' | 'aviso' | 'peligro' | 'info';
 };
 
-/** Una suscripcion en curso no se edita: hay que cancelarla para cambiar de plan. */
+/** Una suscripcion en curso no se edita: hay que cancelarla o esperar a que venza. */
 export function esSuscripcionEnCurso(estado: EstadoSuscripcion | string): boolean {
   return estado === 'activa' || estado === 'prueba';
 }
 
+/** Activa o prueba con fecha_fin hoy o futura. */
+export function esSuscripcionVigente(suscripcion: {
+  estado: string;
+  fechaFin: string;
+}): boolean {
+  return esSuscripcionEnCurso(suscripcion.estado) && diasParaVencer(suscripcion.fechaFin) >= 0;
+}
+
+/** Activa o prueba cuya fecha_fin ya paso; debe pasar a estado vencida. */
+export function debeCerrarsePorVencimiento(suscripcion: {
+  estado: string;
+  fechaFin: string;
+}): boolean {
+  return esSuscripcionEnCurso(suscripcion.estado) && diasParaVencer(suscripcion.fechaFin) < 0;
+}
+
 /**
  * Elige la suscripcion que representa a la empresa en listados y tablero:
- * primero una en curso; si no, la mas reciente no cancelada por fechaFin.
+ * primero una vigente; si no, la mas reciente no cancelada por fechaFin.
  */
 export function elegirSuscripcionActual<T extends { estado: string; fechaFin: string }>(
   filas: T[],
 ): T | null {
-  const enCurso = filas.find((s) => esSuscripcionEnCurso(s.estado));
-  if (enCurso) return enCurso;
+  const vigente = filas.find((s) => esSuscripcionVigente(s));
+  if (vigente) return vigente;
 
   const noCanceladas = filas.filter((s) => s.estado !== 'cancelada');
   if (noCanceladas.length === 0) return null;
