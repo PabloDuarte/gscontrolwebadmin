@@ -9,9 +9,8 @@
     "build": "next build",
     "start": "next start",
     "check-db": "node scripts/check-db.js",
-    "tunnel": "node scripts/tunnel.js",
-    "db:create": "node scripts/create-control-db.js",
     "db:push": "drizzle-kit push",
+    "db:migrate-es-prueba": "node scripts/migrate-es-prueba.js",
     "db:seed": "tsx scripts/seed.ts"
   },
   "dependencies": {
@@ -21,15 +20,14 @@
     "dotenv": "^16.4.5",
     "drizzle-orm": "^0.45.3",
     "lucide-react": "^1.48.0",
-    "mysql2": "^3.11.0",
     "next": "^16.3.6",
     "next-auth": "^5.0.0-beta.32",
     "next-themes": "^0.4.6",
     "nodemailer": "^8.0.11",
+    "postgres": "^3.4.7",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "server-only": "^0.0.1",
-    "ssh2": "^1.15.0",
     "tailwind-merge": "^3.7.0",
     "zod": "^4.6.5"
   },

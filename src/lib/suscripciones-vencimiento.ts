@@ -12,12 +12,12 @@ function hoyIsoLocal(): string {
 }
 
 /** Cierra suscripciones activa/prueba cuya fecha_fin ya pasó. */
-export async function cerrarSuscripcionesVencidas(empresaId?: number) {
+export async function cerrarSuscripcionesVencidas(empresaId?: string) {
   const condiciones = [
     inArray(suscripciones.estado, ['activa', 'prueba']),
     lt(suscripciones.fechaFin, hoyIsoLocal()),
   ];
-  if (empresaId != null) condiciones.push(eq(suscripciones.empresaId, empresaId));
+  if (empresaId) condiciones.push(eq(suscripciones.empresaId, empresaId));
 
   await db
     .update(suscripciones)

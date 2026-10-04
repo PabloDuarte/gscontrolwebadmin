@@ -1,49 +1,55 @@
-import { sql } from 'drizzle-orm';
 import {
   boolean,
   char,
   date,
-  datetime,
-  decimal,
   index,
-  int,
-  mysqlEnum,
-  mysqlTable,
+  integer,
+  numeric,
+  pgEnum,
+  pgTable,
   text,
   timestamp,
+  uuid,
   varchar,
-} from 'drizzle-orm/mysql-core';
+} from 'drizzle-orm/pg-core';
 import {
   ESTADOS_EMPRESA,
   ESTADOS_SUSCRIPCION,
-  ESTADOS_VERIFICACION_BD,
   PERIODICIDADES,
 } from '../dominio';
 
-const creadoEn = timestamp('creado_en').notNull().default(sql`CURRENT_TIMESTAMP`);
-const actualizadoEn = timestamp('actualizado_en')
-  .notNull()
-  .default(sql`CURRENT_TIMESTAMP`)
-  .onUpdateNow();
+export const estadoEmpresaEnum = pgEnum('estado_empresa', ESTADOS_EMPRESA);
+export const estadoSuscripcionEnum = pgEnum('estado_suscripcion', ESTADOS_SUSCRIPCION);
+export const periodicidadEnum = pgEnum('periodicidad', PERIODICIDADES);
+
+const timestamps = {
+  createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' })
+    .notNull()
+    .defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' })
+    .notNull()
+    .defaultNow()
+    .$onUpdateFn(() => new Date()),
+};
 
 /** Cuentas de INTECONAYC. Se crean desde el seed, no hay alta publica. */
-export const usuariosAdmin = mysqlTable('usuarios_admin', {
-  id: int('id').autoincrement().primaryKey(),
+export const usuariosAdmin = pgTable('usuarios_admin', {
+  id: uuid('id').primaryKey().defaultRandom(),
   email: varchar('email', { length: 190 }).notNull().unique(),
   passwordHash: varchar('password_hash', { length: 255 }).notNull(),
   nombre: varchar('nombre', { length: 150 }).notNull(),
   activo: boolean('activo').notNull().default(true),
-  ultimoAcceso: datetime('ultimo_acceso'),
+  ultimoAcceso: timestamp('ultimo_acceso', { withTimezone: true, mode: 'date' }),
   tokenRecuperacion: varchar('token_recuperacion', { length: 64 }),
-  tokenExpira: datetime('token_expira'),
-  creadoEn,
-  actualizadoEn,
+  tokenExpira: timestamp('token_expira', { withTimezone: true, mode: 'date' }),
+  ...timestamps,
 });
 
-export const empresas = mysqlTable(
+/** Tenant raíz: la llave `id` es la que irá en `empresa_id` del producto. */
+export const empresas = pgTable(
   'empresas',
   {
-    id: int('id').autoincrement().primaryKey(),
+    id: uuid('id').primaryKey().defaultRandom(),
     codigo: varchar('codigo', { length: 40 }).notNull().unique(),
     nombreComercial: varchar('nombre_comercial', { length: 150 }).notNull(),
     razonSocial: varchar('razon_social', { length: 200 }),
@@ -51,77 +57,53 @@ export const empresas = mysqlTable(
     contactoNombre: varchar('contacto_nombre', { length: 150 }),
     contactoEmail: varchar('contacto_email', { length: 190 }),
     contactoTelefono: varchar('contacto_telefono', { length: 40 }),
-    estado: mysqlEnum('estado', ESTADOS_EMPRESA).notNull().default('activo'),
+    estado: estadoEmpresaEnum('estado').notNull().default('activo'),
     fechaAlta: date('fecha_alta', { mode: 'string' }).notNull(),
     logoPath: varchar('logo_path', { length: 255 }),
     notas: text('notas'),
-    creadoEn,
-    actualizadoEn,
+    ...timestamps,
   },
   (t) => [index('idx_empresas_estado').on(t.estado)],
 );
 
-/** Como conectarse a la base que usa cada empresa. La contrasena va cifrada. */
-export const conexionesBd = mysqlTable('conexiones_bd', {
-  id: int('id').autoincrement().primaryKey(),
-  empresaId: int('empresa_id')
-    .notNull()
-    .unique()
-    .references(() => empresas.id, { onDelete: 'cascade' }),
-  host: varchar('host', { length: 255 }).notNull().default('127.0.0.1'),
-  puerto: int('puerto').notNull().default(3306),
-  nombreBd: varchar('nombre_bd', { length: 64 }).notNull().unique(),
-  usuario: varchar('usuario', { length: 100 }).notNull(),
-  passwordCifrado: text('password_cifrado').notNull(),
-  usaTunelSsh: boolean('usa_tunel_ssh').notNull().default(false),
-  sshHost: varchar('ssh_host', { length: 255 }),
-  sshPuerto: int('ssh_puerto').default(22),
-  sshUsuario: varchar('ssh_usuario', { length: 100 }),
-  sshKeyPath: varchar('ssh_key_path', { length: 255 }),
-  verificadaEn: datetime('verificada_en'),
-  estadoVerificacion: mysqlEnum('estado_verificacion', ESTADOS_VERIFICACION_BD),
-  creadoEn,
-  actualizadoEn,
-});
-
-export const planes = mysqlTable('planes', {
-  id: int('id').autoincrement().primaryKey(),
+export const planes = pgTable('planes', {
+  id: uuid('id').primaryKey().defaultRandom(),
   codigo: varchar('codigo', { length: 40 }).notNull().unique(),
   nombre: varchar('nombre', { length: 120 }).notNull(),
   descripcion: text('descripcion'),
-  precio: decimal('precio', { precision: 10, scale: 2 }).notNull().default('0.00'),
+  precio: numeric('precio', { precision: 10, scale: 2 }).notNull().default('0.00'),
   moneda: char('moneda', { length: 3 }).notNull().default('MXN'),
-  periodicidad: mysqlEnum('periodicidad', PERIODICIDADES).notNull().default('mensual'),
-  maxEmpleados: int('max_empleados'),
-  maxDispositivos: int('max_dispositivos'),
-  maxUsuarios: int('max_usuarios'),
+  periodicidad: periodicidadEnum('periodicidad').notNull().default('mensual'),
+  maxEmpleados: integer('max_empleados'),
+  maxDispositivos: integer('max_dispositivos'),
+  maxUsuarios: integer('max_usuarios'),
+  /** Si es true, la primera suscripción con este plan se guarda en estado prueba. */
+  esPrueba: boolean('es_prueba').notNull().default(false),
   activo: boolean('activo').notNull().default(true),
-  creadoEn,
-  actualizadoEn,
+  ...timestamps,
 });
 
-export const suscripciones = mysqlTable(
+export const suscripciones = pgTable(
   'suscripciones',
   {
-    id: int('id').autoincrement().primaryKey(),
-    empresaId: int('empresa_id')
+    id: uuid('id').primaryKey().defaultRandom(),
+    empresaId: uuid('empresa_id')
       .notNull()
       .references(() => empresas.id, { onDelete: 'cascade' }),
-    planId: int('plan_id')
+    planId: uuid('plan_id')
       .notNull()
       .references(() => planes.id),
     planNombre: varchar('plan_nombre', { length: 120 }).notNull().default(''),
     planCodigo: varchar('plan_codigo', { length: 40 }),
-    estado: mysqlEnum('estado', ESTADOS_SUSCRIPCION).notNull().default('activa'),
+    estado: estadoSuscripcionEnum('estado').notNull().default('activa'),
     fechaInicio: date('fecha_inicio', { mode: 'string' }).notNull(),
     fechaFin: date('fecha_fin', { mode: 'string' }).notNull(),
-    precio: decimal('precio', { precision: 10, scale: 2 }).notNull().default('0.00'),
+    precio: numeric('precio', { precision: 10, scale: 2 }).notNull().default('0.00'),
     moneda: char('moneda', { length: 3 }).notNull().default('MXN'),
-    periodicidad: mysqlEnum('periodicidad', PERIODICIDADES).notNull().default('mensual'),
+    periodicidad: periodicidadEnum('periodicidad').notNull().default('mensual'),
     renovacionAutomatica: boolean('renovacion_automatica').notNull().default(false),
     notas: text('notas'),
-    creadoEn,
-    actualizadoEn,
+    ...timestamps,
   },
   (t) => [
     index('idx_suscripciones_empresa').on(t.empresaId),
@@ -130,7 +112,6 @@ export const suscripciones = mysqlTable(
 );
 
 export type Empresa = typeof empresas.$inferSelect;
-export type ConexionBd = typeof conexionesBd.$inferSelect;
 export type Plan = typeof planes.$inferSelect;
 export type Suscripcion = typeof suscripciones.$inferSelect;
 export type UsuarioAdmin = typeof usuariosAdmin.$inferSelect;

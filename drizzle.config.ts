@@ -1,15 +1,15 @@
 import 'dotenv/config';
 import { defineConfig } from 'drizzle-kit';
 
+if (!process.env.DATABASE_URL) {
+  throw new Error('Define DATABASE_URL en .env antes de usar drizzle-kit.');
+}
+
 export default defineConfig({
-  dialect: 'mysql',
+  dialect: 'postgresql',
   schema: './src/lib/db/schema.ts',
   out: './drizzle',
   dbCredentials: {
-    host: '127.0.0.1',
-    port: Number(process.env.LOCAL_TUNNEL_PORT ?? 3307),
-    user: process.env.DB_USER!,
-    password: process.env.DB_PASSWORD!,
-    database: process.env.CONTROL_DB_NAME ?? 'gscontrol_clientes',
+    url: process.env.DATABASE_URL,
   },
 });

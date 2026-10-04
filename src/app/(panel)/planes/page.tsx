@@ -53,9 +53,12 @@ export default async function PlanesPage() {
                     </p>
                     <h2 className="mt-1 text-2xl font-semibold tracking-tight">{plan.nombre}</h2>
                   </div>
-                  <Badge tono={plan.activo ? 'exito' : 'neutro'}>
-                    {plan.activo ? 'Activo' : 'Inactivo'}
-                  </Badge>
+                  <div className="flex flex-wrap justify-end gap-1">
+                    {plan.esPrueba ? <Badge tono="info">Prueba</Badge> : null}
+                    <Badge tono={plan.activo ? 'exito' : 'neutro'}>
+                      {plan.activo ? 'Activo' : 'Inactivo'}
+                    </Badge>
+                  </div>
                 </div>
 
                 <p className="mt-8 text-4xl font-semibold tracking-tight">

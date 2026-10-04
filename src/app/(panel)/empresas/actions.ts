@@ -2,20 +2,13 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { and, eq, ne, sql } from 'drizzle-orm';
+import { and, eq, ne } from 'drizzle-orm';
 import { z } from 'zod';
 import { auth } from '@/auth';
 import { db } from '@/lib/db/control';
-import { conexionesBd, empresas, planes, suscripciones, type ConexionBd } from '@/lib/db/schema';
-import { probarConexionEmpresa, type ResultadoPrueba } from '@/lib/db/tenant';
-import { cifrar } from '@/lib/crypto';
-import {
-  ESTADOS_EMPRESA,
-  ESTADOS_SUSCRIPCION,
-  PASSWORD_ENMASCARADA,
-  PERIODICIDADES,
-  type EstadoVerificacionBd,
-} from '@/lib/dominio';
+import { empresas, planes, suscripciones } from '@/lib/db/schema';
+import { esUuidEmpresa } from '@/lib/consultas';
+import { ESTADOS_EMPRESA, PERIODICIDADES } from '@/lib/dominio';
 import {
   formatearTelefono,
   normalizarRfc,
@@ -37,6 +30,8 @@ async function exigirSesion() {
   const sesion = await auth();
   if (!sesion?.user) throw new Error('Sesión no válida');
 }
+
+const uuid = z.string().uuid('Identificador no válido');
 
 const opcional = (max: number) =>
   z
@@ -70,20 +65,6 @@ const esquemaEmpresa = z.object({
   notas: opcional(5000),
 });
 
-const esquemaConexion = z.object({
-  nombreBd: z
-    .string()
-    .trim()
-    .min(1, 'Requerido')
-    .max(64)
-    .transform((v) => v.toUpperCase())
-    .refine((v) => /^[A-Z0-9_]+$/.test(v), 'Sólo letras, números y guion bajo'),
-  host: z.string().trim().min(1, 'Requerido').max(255),
-  puerto: z.coerce.number().int().min(1).max(65535),
-  usuario: z.string().trim().min(1, 'Requerido').max(100),
-  password: z.string(),
-});
-
 function aplanarErrores(error: z.ZodError): Record<string, string> {
   const salida: Record<string, string> = {};
   for (const issue of error.issues) {
@@ -115,13 +96,11 @@ export async function guardarEmpresa(
   await exigirSesion();
 
   const crudo = leer(datos);
-  const id = crudo.id ? Number(crudo.id) : null;
+  const idCrudo = crudo.id?.trim();
+  const id = idCrudo && esUuidEmpresa(idCrudo) ? idCrudo : null;
   const esAlta = !id;
-  // Conexión solo en ficha (edición), nunca en el alta. Vacía = todavía no se configura.
-  const capturaConexion = !esAlta && Boolean(crudo.nombreBd?.trim());
 
   const empresaAnalizada = esquemaEmpresa.safeParse(crudo);
-  const conexionAnalizada = capturaConexion ? esquemaConexion.safeParse(crudo) : null;
 
   const erroresTel = validarTelefonoPartes({
     pais: crudo.telefonoPais ?? '',
@@ -129,12 +108,9 @@ export async function guardarEmpresa(
     numero: crudo.telefonoNumero ?? '',
   });
 
-  if (!empresaAnalizada.success || (conexionAnalizada && !conexionAnalizada.success) || erroresTel) {
+  if (!empresaAnalizada.success || erroresTel) {
     const errores: Record<string, string> = {
       ...(empresaAnalizada.success ? {} : aplanarErrores(empresaAnalizada.error)),
-      ...(conexionAnalizada && !conexionAnalizada.success
-        ? aplanarErrores(conexionAnalizada.error)
-        : {}),
     };
     if (erroresTel) {
       if (erroresTel.pais) errores.telefonoPais = erroresTel.pais;
@@ -186,7 +162,6 @@ export async function guardarEmpresa(
       logoAnterior = actual?.logoPath ?? null;
     }
 
-    // El RFC / TAX ID es el identificador; codigo se alinea a él (columna técnica).
     const codigo = valores.rfc;
 
     let logoPath = logoAnterior;
@@ -204,50 +179,12 @@ export async function guardarEmpresa(
     if (empresaId) {
       await db.update(empresas).set(ficha).where(eq(empresas.id, empresaId));
     } else {
-      const [insertado] = await db.insert(empresas).values(ficha).$returningId();
+      const [insertado] = await db.insert(empresas).values(ficha).returning({ id: empresas.id });
       empresaId = insertado.id;
     }
 
     if (logo && logo.size > 0 && logoAnterior && logoAnterior !== logoPath) {
       await borrarLogoEmpresa(logoAnterior);
-    }
-
-    if (conexionAnalizada?.success) {
-      const c = conexionAnalizada.data;
-      const [existente] = await db
-        .select()
-        .from(conexionesBd)
-        .where(eq(conexionesBd.empresaId, empresaId))
-        .limit(1);
-
-      const passwordNueva =
-        c.password && c.password !== PASSWORD_ENMASCARADA ? c.password : '';
-
-      if (!existente && !passwordNueva) {
-        return conValores(crudo, { errores: { password: 'Requerida para una conexión nueva' } });
-      }
-
-      const base = {
-        empresaId,
-        nombreBd: c.nombreBd,
-        host: c.host,
-        puerto: c.puerto,
-        usuario: c.usuario,
-        usaTunelSsh: false,
-        sshHost: null,
-        sshPuerto: null,
-        sshUsuario: null,
-        sshKeyPath: null,
-      };
-
-      if (existente) {
-        await db
-          .update(conexionesBd)
-          .set(passwordNueva ? { ...base, passwordCifrado: cifrar(passwordNueva) } : base)
-          .where(eq(conexionesBd.id, existente.id));
-      } else {
-        await db.insert(conexionesBd).values({ ...base, passwordCifrado: cifrar(passwordNueva) });
-      }
     }
   } catch (error) {
     return conValores(crudo, { mensaje: mensajeDeError(error) });
@@ -261,8 +198,8 @@ export async function guardarEmpresa(
 
 export async function eliminarEmpresa(datos: FormData) {
   await exigirSesion();
-  const id = Number(datos.get('id'));
-  if (Number.isInteger(id)) {
+  const id = String(datos.get('id') ?? '');
+  if (esUuidEmpresa(id)) {
     const [actual] = await db
       .select({ logoPath: empresas.logoPath })
       .from(empresas)
@@ -276,132 +213,9 @@ export async function eliminarEmpresa(datos: FormData) {
   redirect('/empresas');
 }
 
-async function guardarResultadoPrueba(empresaId: number | null, resultado: ResultadoPrueba) {
-  if (!empresaId || !Number.isInteger(empresaId)) return;
-  const estado: EstadoVerificacionBd | null = resultado.ok
-    ? 'verificada'
-    : resultado.noExiste
-      ? 'no_existe'
-      : null;
-  if (!estado) return;
-
-  await db
-    .update(conexionesBd)
-    .set({ estadoVerificacion: estado, verificadaEn: sql`NOW()` })
-    .where(eq(conexionesBd.empresaId, empresaId));
-  revalidatePath('/empresas');
-  revalidatePath('/');
-  revalidatePath(`/empresas/${empresaId}`);
-}
-
-function mensajePrueba(nombreBd: string, resultado: ResultadoPrueba): EstadoFormulario {
-  if (resultado.ok) {
-    return { ok: true, mensaje: `Base ${nombreBd} verificada. Servidor ${resultado.version}.` };
-  }
-  if (resultado.noExiste) {
-    return { ok: false, mensaje: `Base ${nombreBd} no existe.` };
-  }
-  return { ok: false, mensaje: `No se pudo conectar: ${resultado.mensaje}` };
-}
-
-export async function probarConexion(
-  _previo: EstadoFormulario | undefined,
-  datos: FormData,
-): Promise<EstadoFormulario> {
-  await exigirSesion();
-
-  const empresaId = Number(datos.get('empresaId'));
-  const [conexion] = await db
-    .select()
-    .from(conexionesBd)
-    .where(eq(conexionesBd.empresaId, empresaId))
-    .limit(1);
-
-  if (!conexion) {
-    return { ok: false, mensaje: 'Esta empresa todavía no tiene parámetros de conexión.' };
-  }
-
-  const resultado = await probarConexionEmpresa(conexion);
-  await guardarResultadoPrueba(empresaId, resultado);
-  return mensajePrueba(conexion.nombreBd, resultado);
-}
-
-/** Prueba la conexión con los parámetros del formulario (alta o edición sin guardar). */
-export async function probarConexionDesdeFormulario(
-  _previo: EstadoFormulario | undefined,
-  datos: FormData,
-): Promise<EstadoFormulario> {
-  await exigirSesion();
-
-  const crudo = leer(datos);
-  const analisis = esquemaConexion.safeParse(crudo);
-
-  if (!analisis.success) {
-    return { ok: false, mensaje: 'Completa los datos de conexión antes de probar.', errores: aplanarErrores(analisis.error) };
-  }
-
-  const c = analisis.data;
-  let passwordPlana =
-    c.password && c.password !== PASSWORD_ENMASCARADA ? c.password : '';
-
-  const empresaId = crudo.empresaId ? Number(crudo.empresaId) : null;
-  if (!passwordPlana && empresaId) {
-    const [guardada] = await db
-      .select()
-      .from(conexionesBd)
-      .where(eq(conexionesBd.empresaId, empresaId))
-      .limit(1);
-    if (guardada) {
-      const temporal: ConexionBd = {
-        ...guardada,
-        host: c.host,
-        puerto: c.puerto,
-        nombreBd: c.nombreBd,
-        usuario: c.usuario,
-        usaTunelSsh: false,
-        sshHost: null,
-        sshPuerto: null,
-        sshUsuario: null,
-        sshKeyPath: null,
-      };
-      const resultado = await probarConexionEmpresa(temporal);
-      await guardarResultadoPrueba(empresaId, resultado);
-      return mensajePrueba(c.nombreBd, resultado);
-    }
-  }
-
-  if (!passwordPlana) {
-    return { ok: false, mensaje: 'Indica la contraseña para probar la conexión.' };
-  }
-
-  const temporal = {
-    id: 0,
-    empresaId: 0,
-    host: c.host,
-    puerto: c.puerto,
-    nombreBd: c.nombreBd,
-    usuario: c.usuario,
-    passwordCifrado: cifrar(passwordPlana),
-    usaTunelSsh: false,
-    sshHost: null,
-    sshPuerto: null,
-    sshUsuario: null,
-    sshKeyPath: null,
-    verificadaEn: null,
-    estadoVerificacion: null,
-    creadoEn: new Date(),
-    actualizadoEn: new Date(),
-  } satisfies ConexionBd;
-
-  const resultado = await probarConexionEmpresa(temporal);
-  await guardarResultadoPrueba(empresaId, resultado);
-  return mensajePrueba(c.nombreBd, resultado);
-}
-
 const esquemaSuscripcion = z.object({
-  empresaId: z.coerce.number().int().positive(),
-  planId: z.coerce.number().int().positive({ message: 'Elige un plan' }),
-  estado: z.enum(ESTADOS_SUSCRIPCION),
+  empresaId: uuid,
+  planId: uuid,
   fechaInicio: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha no válida'),
   fechaFin: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha no válida'),
   precio: z.coerce.number().min(0),
@@ -420,7 +234,9 @@ export async function guardarSuscripcion(
   const crudo = leer(datos);
   const analisis = esquemaSuscripcion.safeParse({
     ...crudo,
-    renovacionAutomatica: crudo.renovacionAutomatica === 'on',
+    fechaInicio: crudo.fechaInicio?.trim(),
+    fechaFin: crudo.fechaFin?.trim(),
+    renovacionAutomatica: false,
   });
 
   if (!analisis.success) {
@@ -430,14 +246,6 @@ export async function guardarSuscripcion(
   const valores = analisis.data;
   if (valores.fechaFin < valores.fechaInicio) {
     return { errores: { fechaFin: 'Debe ser posterior al inicio' } };
-  }
-
-  if (valores.estado === 'cancelada' || valores.estado === 'vencida') {
-    return {
-      errores: {
-        estado: 'El alta solo admite activa, o prueba si es la primera suscripción de la empresa.',
-      },
-    };
   }
 
   try {
@@ -462,21 +270,23 @@ export async function guardarSuscripcion(
       };
     }
 
-    if (filas.length > 0 && valores.estado === 'prueba') {
-      return {
-        errores: { estado: 'La prueba solo aplica a la primera suscripción de la empresa.' },
-      };
-    }
-
     const [plan] = await db
-      .select({ nombre: planes.nombre, codigo: planes.codigo })
+      .select({
+        nombre: planes.nombre,
+        codigo: planes.codigo,
+        esPrueba: planes.esPrueba,
+      })
       .from(planes)
       .where(eq(planes.id, valores.planId))
       .limit(1);
     if (!plan) return { errores: { planId: 'El plan no existe' } };
 
+    const esPrimera = filas.length === 0;
+    const estado = plan.esPrueba && esPrimera ? ('prueba' as const) : ('activa' as const);
+
     await db.insert(suscripciones).values({
       ...valores,
+      estado,
       precio: valores.precio.toFixed(2),
       planNombre: plan.nombre,
       planCodigo: plan.codigo,
@@ -497,9 +307,9 @@ export async function guardarSuscripcion(
 export async function cancelarSuscripcion(datos: FormData): Promise<void> {
   await exigirSesion();
 
-  const empresaId = Number(datos.get('empresaId'));
-  const suscripcionId = Number(datos.get('suscripcionId'));
-  if (!Number.isInteger(empresaId) || !Number.isInteger(suscripcionId)) {
+  const empresaId = String(datos.get('empresaId') ?? '');
+  const suscripcionId = String(datos.get('suscripcionId') ?? '');
+  if (!esUuidEmpresa(empresaId) || !uuid.safeParse(suscripcionId).success) {
     throw new Error('Datos no válidos');
   }
 
@@ -528,7 +338,11 @@ export async function cancelarSuscripcion(datos: FormData): Promise<void> {
 
 function mensajeDeError(error: unknown) {
   const texto = error instanceof Error ? error.message : String(error);
-  if (texto.includes('ER_DUP_ENTRY') || texto.includes('Duplicate entry')) {
+  if (
+    texto.includes('23505') ||
+    texto.includes('unique constraint') ||
+    texto.includes('Duplicate entry')
+  ) {
     if (texto.includes('rfc') || texto.includes('codigo')) {
       return 'Ya existe una empresa con este RFC / ID fiscal.';
     }

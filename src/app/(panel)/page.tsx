@@ -6,23 +6,28 @@ import { Badge } from '@/components/ui/badge';
 import { buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { listarEmpresas } from '@/lib/consultas';
-import { TONO_EMPRESA, capitalizar, type EstadoEmpresa } from '@/lib/dominio';
-import { calcularVigencia, resumirAlertas } from '@/lib/suscripciones';
+import { TONO_EMPRESA, TONO_SUSCRIPCION, capitalizar, type EstadoEmpresa, type EstadoSuscripcion } from '@/lib/dominio';
+import { calcularVigencia, esSuscripcionVigente, resumirAlertas } from '@/lib/suscripciones';
 import { cn, formatearFecha } from '@/lib/utils';
 
 export default async function TableroPage() {
   const filas = await listarEmpresas();
-  const alertas = resumirAlertas(
-    filas
-      .filter((f) => f.suscripcion)
-      .map((f) => ({ fechaFin: f.suscripcion!.fechaFin, estado: f.suscripcion!.estado })),
-  );
+  const suscripcionesPorEmpresa = filas
+    .filter((f) => f.suscripcion)
+    .map((f) => ({ fechaFin: f.suscripcion!.fechaFin, estado: f.suscripcion!.estado }));
+
+  const alertas = resumirAlertas(suscripcionesPorEmpresa);
+
+  const enCurso = filas
+    .filter((f) => f.suscripcion && esSuscripcionVigente(f.suscripcion))
+    .sort((a, b) => a.suscripcion!.fechaFin.localeCompare(b.suscripcion!.fechaFin));
 
   const atencion = filas
     .filter((f) => {
       if (!f.suscripcion || f.suscripcion.estado === 'cancelada') return false;
+      if (!esSuscripcionVigente(f.suscripcion)) return true;
       const v = calcularVigencia(f.suscripcion.fechaFin, f.suscripcion.estado);
-      return v.nivel === 'vencida' || v.nivel === 'critica' || v.nivel === 'proxima';
+      return v.nivel === 'critica' || v.nivel === 'proxima';
     })
     .sort((a, b) => a.suscripcion!.fechaFin.localeCompare(b.suscripcion!.fechaFin));
 
@@ -61,10 +66,13 @@ export default async function TableroPage() {
             <div>
               <p className="flex items-center gap-2 text-sm text-muted-foreground">
                 <CalendarClock className="size-4" />
-                Suscripciones vigentes
+                Suscripciones en curso
               </p>
               <p className="mt-1 text-3xl font-semibold tracking-tight tabular-nums">
-                {alertas.vigentes}
+                {alertas.enCurso}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Activas y de prueba con vigencia al día de hoy
               </p>
             </div>
             <Link
@@ -97,6 +105,56 @@ export default async function TableroPage() {
       </div>
 
       <Card>
+        <CardHeader>
+          <CardTitle>Suscripciones en curso</CardTitle>
+          <CardDescription>
+            Empresas con plan activo o en periodo de prueba vigente.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {enCurso.length === 0 ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              Ninguna empresa tiene una suscripción vigente en este momento.
+            </p>
+          ) : (
+            <ul className="divide-y divide-black/5 dark:divide-white/10">
+              {enCurso.map(({ empresa, suscripcion, plan }) => {
+                const vigencia = calcularVigencia(
+                  suscripcion!.fechaFin,
+                  suscripcion!.estado as EstadoSuscripcion,
+                );
+                return (
+                  <li key={empresa.id}>
+                    <Link
+                      href={`/empresas/${empresa.id}`}
+                      className="flex items-center gap-4 rounded-2xl px-2 py-4 transition-all duration-200 ease-apple hover:bg-black/[0.03] dark:hover:bg-white/[0.04]"
+                    >
+                      <LogoEmpresa src={empresa.logoPath} alt={empresa.nombreComercial} />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-medium">{empresa.nombreComercial}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {suscripcion!.planNombre || plan?.nombre || 'Sin plan'}
+                        </p>
+                      </div>
+                      <Badge tono={TONO_SUSCRIPCION[suscripcion!.estado as EstadoSuscripcion]}>
+                        {capitalizar(suscripcion!.estado)}
+                      </Badge>
+                      <div className="text-right">
+                        <Badge tono={vigencia.tono}>{vigencia.etiqueta}</Badge>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Hasta {formatearFecha(suscripcion!.fechaFin)}
+                        </p>
+                      </div>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
         <CardHeader className="flex flex-row items-start justify-between gap-4">
           <div className="space-y-1">
             <CardTitle className="flex items-center gap-2">
@@ -114,7 +172,7 @@ export default async function TableroPage() {
               <p className="text-sm text-muted-foreground">
                 {filas.length === 0
                   ? 'Todavía no hay empresas. Da de alta la primera para comenzar.'
-                  : 'Ninguna suscripción está por vencer.'}
+                  : 'Ninguna suscripción requiere atención por vencimiento.'}
               </p>
               {filas.length === 0 ? (
                 <Link href="/empresas/nueva" className={`${buttonVariants()} mt-5`}>
@@ -126,7 +184,10 @@ export default async function TableroPage() {
           ) : (
             <ul className="divide-y divide-black/5 dark:divide-white/10">
               {atencion.map(({ empresa, suscripcion, plan }) => {
-                const vigencia = calcularVigencia(suscripcion!.fechaFin, suscripcion!.estado);
+                const vigencia = calcularVigencia(
+                  suscripcion!.fechaFin,
+                  suscripcion!.estado as EstadoSuscripcion,
+                );
                 return (
                   <li key={empresa.id}>
                     <Link

@@ -5,26 +5,20 @@ Panel interno de INTECONAYC para administrar empresas clientes, planes y suscrip
 ## Requisitos
 
 - Node.js 20 o superior
-- Túnel SSH hacia el MariaDB de DigitalOcean
+- Proyecto [Supabase](https://supabase.com) con Postgres (cadena `DATABASE_URL`)
 
 ## Arranque
 
-1. Copia `.env.example` a `.env` y llena los valores. La llave SSH se referencia por ruta; no va en el repo.
-2. Abre el túnel (déjalo corriendo):
+1. Copia `.env.example` a `.env` y llena los valores (sobre todo `DATABASE_URL`, `AUTH_SECRET`, `ADMIN_*`).
+2. Aplica el esquema y el seed (primera vez):
 
 ```bash
-npm run tunnel
-```
-
-3. Crea la base de control, las tablas y el usuario inicial (sólo la primera vez):
-
-```bash
-npm run db:create
+npm install
 npm run db:push
 npm run db:seed
 ```
 
-4. Arranca el panel:
+3. Arranca el panel:
 
 ```bash
 npm run dev
@@ -36,13 +30,13 @@ Entra en [http://localhost:3000](http://localhost:3000) con el correo y contrase
 
 | Comando | Uso |
 | --- | --- |
-| `npm run tunnel` | Túnel SSH a `127.0.0.1:3307` |
-| `npm run check-db` | Prueba de conexión al servidor |
-| `npm run db:create` | Crea `gscontrol_clientes` si no existe |
-| `npm run db:push` | Aplica el esquema Drizzle |
+| `npm run check-db` | Prueba de conexión a Postgres |
+| `npm run db:push` | Aplica el esquema Drizzle en Supabase |
 | `npm run db:seed` | Planes iniciales y usuario de INTECONAYC |
 | `npm run dev` | Panel en desarrollo |
 
-## Alcance de esta etapa
+Cada empresa recibe un `empresa_id` (UUID) al darse de alta; es la llave de tenant para tablas con RLS en Supabase.
 
-Sólo se crea y usa la base `gscontrol_clientes`. No se leen ni se modifican otras bases del servidor. El detalle vive en [plan/gscontrolweb_plan.md](plan/gscontrolweb_plan.md) y las funcionalidades en [plan/features.md](plan/features.md).
+## Alcance
+
+Datos de control en una sola base Postgres (Supabase). El detalle vive en [plan/gscontrolweb_plan.md](plan/gscontrolweb_plan.md) y las funcionalidades en [plan/features.md](plan/features.md).

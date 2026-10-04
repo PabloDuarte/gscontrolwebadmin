@@ -1,16 +1,25 @@
-import { withConnection, config } from '../src/db/connection.js';
+import 'dotenv/config';
+import postgres from 'postgres';
 
-const result = await withConnection(async (pool) => {
-  const [[version]] = await pool.query('SELECT VERSION() AS version, NOW() AS ahora');
-  const [databases] = await pool.query('SHOW DATABASES');
-  return { version, databases };
+const url = process.env.DATABASE_URL;
+if (!url) {
+  console.error('Falta DATABASE_URL en .env');
+  process.exit(1);
+}
+
+const sql = postgres(url, {
+  prepare: false,
+  max: 1,
+  ssl: url.includes('supabase') ? 'require' : undefined,
 });
 
-console.log(`Tunel SSH: ${config.ssh.username}@${config.ssh.host}:${config.ssh.port}`);
-console.log(`MySQL:     ${config.db.user}@${config.db.host}:${config.db.port}`);
-console.log(`Version:   ${result.version.version}`);
-console.log(`Hora srv:  ${result.version.ahora}`);
-console.log('\nBases de datos:');
-for (const row of result.databases) {
-  console.log(`  - ${Object.values(row)[0]}`);
+try {
+  const [fila] = await sql`SELECT current_database() AS base, version() AS version`;
+  console.log(`Conectado a ${fila.base}`);
+  console.log(fila.version);
+} catch (error) {
+  console.error(error instanceof Error ? error.message : error);
+  process.exit(1);
+} finally {
+  await sql.end({ timeout: 5 });
 }

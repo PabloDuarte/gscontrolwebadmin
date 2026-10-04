@@ -20,9 +20,12 @@ async function exigirSesion() {
   if (!sesion?.user) throw new Error('Sesión no válida');
 }
 
-const enteroOpcional = z
-  .union([z.literal(''), z.coerce.number().int().min(1)])
-  .transform((v) => (v === '' ? null : v));
+const enteroOpcional = z.preprocess(
+  (v) => (v === undefined || v === null ? '' : v),
+  z
+    .union([z.literal(''), z.coerce.number().int().min(1, 'Mínimo 1')])
+    .transform((v) => (v === '' ? null : v)),
+);
 
 const esquemaPlan = z.object({
   codigo: z
@@ -44,6 +47,7 @@ const esquemaPlan = z.object({
   maxEmpleados: enteroOpcional,
   maxDispositivos: enteroOpcional,
   maxUsuarios: enteroOpcional,
+  esPrueba: z.coerce.boolean(),
   activo: z.coerce.boolean(),
 });
 
@@ -73,6 +77,7 @@ export async function guardarPlan(
   const crudo = leer(datos);
   const analisis = esquemaPlan.safeParse({
     ...crudo,
+    esPrueba: crudo.esPrueba === 'on',
     activo: crudo.activo === 'on',
   });
 
@@ -84,7 +89,9 @@ export async function guardarPlan(
     ...analisis.data,
     precio: analisis.data.precio.toFixed(2),
   };
-  const id = crudo.id ? Number(crudo.id) : null;
+  const idCrudo = crudo.id?.trim();
+  const id =
+    idCrudo && /^[0-9a-f-]{36}$/i.test(idCrudo) ? idCrudo : null;
 
   try {
     if (id) {
@@ -109,7 +116,11 @@ export async function guardarPlan(
     }
   } catch (error) {
     const texto = error instanceof Error ? error.message : String(error);
-    if (texto.includes('ER_DUP_ENTRY') || texto.includes('Duplicate entry')) {
+    if (
+      texto.includes('23505') ||
+      texto.includes('unique constraint') ||
+      texto.includes('Duplicate entry')
+    ) {
       return { mensaje: 'Ya existe un plan con ese código.' };
     }
     return { mensaje: texto };

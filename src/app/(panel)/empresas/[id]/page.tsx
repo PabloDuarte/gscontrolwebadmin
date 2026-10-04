@@ -5,8 +5,7 @@ import { ConfirmSubmit } from '@/components/confirm-submit';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { TBody, TD, TH, THead, TR, Table } from '@/components/ui/table';
-import { descifrar } from '@/lib/crypto';
-import { obtenerEmpresa } from '@/lib/consultas';
+import { esUuidEmpresa, obtenerEmpresa } from '@/lib/consultas';
 import {
   ETIQUETA_PERIODICIDAD,
   TONO_EMPRESA,
@@ -16,7 +15,6 @@ import {
   type EstadoSuscripcion,
   type Periodicidad,
 } from '@/lib/dominio';
-import { obtenerConexionLicenciamiento, sugerirBase } from '@/lib/licenciamiento';
 import { calcularVigencia, esSuscripcionVigente } from '@/lib/suscripciones';
 import { formatearFecha, formatearMoneda } from '@/lib/utils';
 import { cancelarSuscripcion, eliminarEmpresa } from '../actions';
@@ -32,50 +30,18 @@ export default async function EmpresaDetallePage({
 }) {
   await connection();
   const { id } = await params;
-  const empresaId = Number(id);
-  if (!Number.isInteger(empresaId)) notFound();
+  if (!esUuidEmpresa(id)) notFound();
 
-  const datos = await obtenerEmpresa(empresaId);
+  const datos = await obtenerEmpresa(id);
   if (!datos) notFound();
 
-  const { empresa, conexion, suscripciones, planes } = datos;
+  const { empresa, suscripciones, planes } = datos;
   const enCurso = suscripciones.find((s) => esSuscripcionVigente(s)) ?? null;
   const historial = suscripciones.filter((s) => !enCurso || s.id !== enCurso.id);
   const ultima = enCurso ? null : (suscripciones[0] ?? null);
   const nombrePlan = (s: (typeof suscripciones)[number]) =>
     s.planNombre || planes.find((p) => p.id === s.planId)?.nombre || String(s.planId);
   const vigencia = enCurso ? calcularVigencia(enCurso.fechaFin, enCurso.estado) : null;
-  let passwordConexion = '';
-  if (conexion) {
-    try {
-      passwordConexion = descifrar(conexion.passwordCifrado);
-    } catch {
-      passwordConexion = '';
-    }
-  }
-
-  const lic = conexion ? null : await obtenerConexionLicenciamiento();
-  const conexionVisible = conexion
-    ? {
-        nombreBd: conexion.nombreBd,
-        host: conexion.host,
-        puerto: conexion.puerto,
-        usuario: conexion.usuario,
-        password: passwordConexion,
-        verificadaEn: conexion.verificadaEn,
-        estadoVerificacion: conexion.estadoVerificacion,
-        guardada: true,
-      }
-    : {
-        nombreBd: sugerirBase(empresa.nombreComercial, lic?.bases ?? []),
-        host: lic?.dbHost ?? '127.0.0.1',
-        puerto: lic?.dbPuerto ?? 3306,
-        usuario: lic?.dbUsuario ?? '',
-        password: lic?.dbPassword ?? '',
-        verificadaEn: null,
-        estadoVerificacion: null,
-        guardada: false,
-      };
 
   return (
     <>
@@ -83,10 +49,8 @@ export default async function EmpresaDetallePage({
         titulo={empresa.nombreComercial}
         descripcion={[
           empresa.rfc,
+          `empresa_id ${empresa.id}`,
           enCurso ? `Plan ${nombrePlan(enCurso)} hasta ${formatearFecha(enCurso.fechaFin)}` : null,
-          conexionVisible.nombreBd
-            ? `Base ${conexionVisible.nombreBd} · ${conexionVisible.usuario}@${conexionVisible.host}:${conexionVisible.puerto}`
-            : null,
         ]
           .filter(Boolean)
           .join(' · ')}
@@ -97,23 +61,28 @@ export default async function EmpresaDetallePage({
         }
       />
 
-      <EmpresaForm
-        key={empresa.id}
-        empresa={{ ...empresa, rfc: empresa.rfc ?? '' }}
-        conexion={conexionVisible}
-      />
+      <EmpresaForm key={empresa.id} empresa={{ ...empresa, rfc: empresa.rfc ?? '' }} />
 
       <Card>
-        <CardHeader>
-          <CardTitle>Suscripción</CardTitle>
-          <CardDescription>
-            {enCurso && vigencia
-              ? `${vigencia.etiqueta}. Vigente hasta ${formatearFecha(enCurso.fechaFin)}. No se edita; al vencer se cierra y podrás crear el siguiente ciclo.`
-              : ultima
-                ? 'La suscripción anterior ya no está vigente. Elige un plan y captura el precio del siguiente ciclo.'
-                : 'Primera suscripción de esta empresa. La prueba solo está disponible en este alta.'}
-          </CardDescription>
-        </CardHeader>
+        {enCurso ? (
+          <CardHeader className="sticky top-4 z-20 flex-row items-start justify-between gap-4 space-y-0 rounded-3xl bg-white/95 shadow-apple backdrop-blur-xl dark:bg-[#161617]/95">
+            <div className="space-y-1.5">
+              <CardTitle>Suscripción / Licenciamiento</CardTitle>
+              <CardDescription>
+                {vigencia
+                  ? `${vigencia.etiqueta}. Vigente hasta ${formatearFecha(enCurso.fechaFin)}. El periodo lo marcan inicio y fin.`
+                  : null}
+              </CardDescription>
+            </div>
+            <form action={cancelarSuscripcion} className="shrink-0">
+              <input type="hidden" name="empresaId" value={empresa.id} />
+              <input type="hidden" name="suscripcionId" value={enCurso.id} />
+              <ConfirmSubmit mensaje="¿Cancelar esta suscripción vigente? Quedará en el historial y podrás crear un ciclo nuevo.">
+                Cancelar suscripción
+              </ConfirmSubmit>
+            </form>
+          </CardHeader>
+        ) : null}
         <CardContent>
           {enCurso ? (
             <div className="space-y-5">
@@ -149,7 +118,7 @@ export default async function EmpresaDetallePage({
                 </div>
                 <div>
                   <dt className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    Precio
+                    Referencia de cobro
                   </dt>
                   <dd className="mt-1 text-sm">
                     {formatearMoneda(enCurso.precio, enCurso.moneda)} ·{' '}
@@ -165,26 +134,24 @@ export default async function EmpresaDetallePage({
                   </div>
                 ) : null}
               </dl>
-
-              <form action={cancelarSuscripcion}>
-                <input type="hidden" name="empresaId" value={empresa.id} />
-                <input type="hidden" name="suscripcionId" value={enCurso.id} />
-                <ConfirmSubmit mensaje="¿Cancelar esta suscripción vigente? Quedará en el historial y podrás crear un ciclo nuevo.">
-                  Cancelar suscripción
-                </ConfirmSubmit>
-              </form>
             </div>
           ) : (
             <SuscripcionForm
               key={empresa.id}
               empresaId={empresa.id}
-              permitePrueba={suscripciones.length === 0}
+              esPrimeraSuscripcion={suscripciones.length === 0}
+              descripcion={
+                ultima
+                  ? 'La suscripción anterior ya no está vigente. Define inicio y fin. El precio pactado es el precio del plan por los meses de la periodicidad.'
+                  : 'Primera suscripción del licenciamiento. Define inicio y fin. Si el plan es de prueba, el estado inicial se marca automáticamente.'
+              }
               planes={planes.map((p) => ({
                 id: p.id,
                 nombre: p.nombre,
                 precio: p.precio,
                 moneda: p.moneda,
                 periodicidad: p.periodicidad as Periodicidad,
+                esPrueba: p.esPrueba,
               }))}
             />
           )}
@@ -204,7 +171,7 @@ export default async function EmpresaDetallePage({
                   <TH>Plan</TH>
                   <TH>Estado</TH>
                   <TH>Periodo</TH>
-                  <TH>Precio</TH>
+                  <TH>Referencia</TH>
                   <TH>Vigencia</TH>
                 </TR>
               </THead>
@@ -239,7 +206,7 @@ export default async function EmpresaDetallePage({
         <CardHeader>
           <CardTitle>Eliminar empresa</CardTitle>
           <CardDescription>
-            También borra su conexión y sus suscripciones. Esta acción no se puede deshacer.
+            También borra sus suscripciones. Esta acción no se puede deshacer.
           </CardDescription>
         </CardHeader>
         <CardContent>

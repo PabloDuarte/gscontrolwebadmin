@@ -153,9 +153,17 @@ export function CuentaMenu({
             className="w-full max-w-sm space-y-4 rounded-3xl border border-black/5 bg-white/95 p-6 shadow-apple-lg backdrop-blur-xl dark:border-white/10 dark:bg-[#161617]/95"
             onMouseDown={(e) => e.stopPropagation()}
           >
-            <div>
-              <p className="text-[17px] font-medium tracking-tight">Cambiar contraseña</p>
-              <p className="mt-1 text-sm text-muted-foreground">{correo}</p>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[17px] font-medium tracking-tight">Cambiar contraseña</p>
+                <p className="mt-1 text-sm text-muted-foreground">{correo}</p>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <Button type="button" variant="outline" size="sm" onClick={() => setContrasena(false)}>
+                  Cancelar
+                </Button>
+                <GuardarContrasena />
+              </div>
             </div>
             {actualizada ? (
               <p className="rounded-2xl bg-emerald-500/10 px-3.5 py-2.5 text-sm text-emerald-600 dark:text-emerald-400">
@@ -179,12 +187,6 @@ export function CuentaMenu({
                 required
               />
             </Field>
-            <div className="flex justify-end gap-2 pt-1">
-              <Button type="button" variant="outline" size="sm" onClick={() => setContrasena(false)}>
-                Cancelar
-              </Button>
-              <GuardarContrasena />
-            </div>
           </form>
         </div>
       ) : null}

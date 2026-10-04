@@ -11,7 +11,7 @@ import { ETIQUETA_PERIODICIDAD, PERIODICIDADES } from '@/lib/dominio';
 import { guardarPlan, type EstadoFormulario } from './actions';
 
 export type PlanVisible = {
-  id: number;
+  id: string;
   codigo: string;
   nombre: string;
   descripcion: string | null;
@@ -21,6 +21,7 @@ export type PlanVisible = {
   maxEmpleados: number | null;
   maxDispositivos: number | null;
   maxUsuarios: number | null;
+  esPrueba: boolean;
   activo: boolean;
 };
 
@@ -45,9 +46,17 @@ export function PlanForm({ plan }: { plan?: PlanVisible }) {
       {plan ? <input type="hidden" name="id" value={plan.id} /> : null}
 
       <Card>
-        <CardHeader>
-          <CardTitle>Datos del plan</CardTitle>
-          <CardDescription>Precio, periodicidad y límites que se ofrecen al cliente.</CardDescription>
+        <CardHeader className="sticky top-4 z-20 flex-row items-start justify-between gap-4 space-y-0 rounded-3xl bg-white/95 shadow-apple backdrop-blur-xl dark:bg-[#161617]/95">
+          <div className="space-y-1.5">
+            <CardTitle>Datos del plan</CardTitle>
+            <CardDescription>Precio, periodicidad y límites que se ofrecen al cliente.</CardDescription>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <Guardar />
+            <Link href="/planes" className={buttonVariants({ variant: 'ghost' })}>
+              Cancelar
+            </Link>
+          </div>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2">
           <Field label="Código" htmlFor="codigo" error={error('codigo')}>
@@ -92,35 +101,63 @@ export function PlanForm({ plan }: { plan?: PlanVisible }) {
             </Select>
           </Field>
 
-          <Field label="Máx. empleados" htmlFor="maxEmpleados" hint="Vacío = sin límite">
+          <Field
+            label="Máx. empleados"
+            htmlFor="maxEmpleados"
+            hint="Vacío = sin límite"
+            error={error('maxEmpleados')}
+          >
             <Input
               id="maxEmpleados"
               name="maxEmpleados"
               type="number"
               min="1"
+              step="1"
               defaultValue={plan?.maxEmpleados ?? ''}
             />
           </Field>
 
-          <Field label="Máx. dispositivos" htmlFor="maxDispositivos" hint="Vacío = sin límite">
+          <Field
+            label="Máx. dispositivos"
+            htmlFor="maxDispositivos"
+            hint="Vacío = sin límite"
+            error={error('maxDispositivos')}
+          >
             <Input
               id="maxDispositivos"
               name="maxDispositivos"
               type="number"
               min="1"
+              step="1"
               defaultValue={plan?.maxDispositivos ?? ''}
             />
           </Field>
 
-          <Field label="Máx. usuarios" htmlFor="maxUsuarios" hint="Vacío = sin límite">
+          <Field
+            label="Máx. usuarios"
+            htmlFor="maxUsuarios"
+            hint="Vacío = sin límite"
+            error={error('maxUsuarios')}
+          >
             <Input
               id="maxUsuarios"
               name="maxUsuarios"
               type="number"
               min="1"
+              step="1"
               defaultValue={plan?.maxUsuarios ?? ''}
             />
           </Field>
+
+          <label className="flex items-center gap-2.5 text-sm sm:col-span-2">
+            <input
+              type="checkbox"
+              name="esPrueba"
+              defaultChecked={plan?.esPrueba ?? false}
+              className="size-4 rounded-md border-input accent-primary"
+            />
+            Plan de prueba (la primera suscripción con este plan queda en periodo de prueba)
+          </label>
 
           <label className="flex items-center gap-2.5 text-sm sm:col-span-2">
             <input
@@ -141,12 +178,13 @@ export function PlanForm({ plan }: { plan?: PlanVisible }) {
         </p>
       ) : null}
 
-      <div className="flex items-center gap-2">
-        <Guardar />
-        <Link href="/planes" className={buttonVariants({ variant: 'ghost' })}>
-          Cancelar
-        </Link>
-      </div>
+      {estado?.errores && !estado.mensaje ? (
+        <p className="flex items-center gap-2 rounded-2xl bg-destructive/10 px-3.5 py-2.5 text-sm text-destructive">
+          <AlertCircle className="size-4 shrink-0" />
+          Revisa los campos marcados.
+        </p>
+      ) : null}
+
     </form>
   );
 }

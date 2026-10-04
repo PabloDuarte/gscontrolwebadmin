@@ -31,8 +31,8 @@ export async function cambiarContrasena(
   datos: FormData,
 ): Promise<EstadoContrasena> {
   const sesion = await auth();
-  const id = Number(sesion?.user?.id);
-  if (!sesion?.user || !Number.isInteger(id)) return { mensaje: 'Sesión no válida' };
+  const id = sesion?.user?.id;
+  if (!sesion?.user || !id) return { mensaje: 'Sesión no válida' };
 
   const analisis = esquema.safeParse({
     nueva: datos.get('nueva'),

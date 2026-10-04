@@ -51,11 +51,12 @@ export function elegirSuscripcionActual<T extends { estado: string; fechaFin: st
 
 /** Dias entre hoy y la fecha de fin. Negativo si ya paso. */
 export function diasParaVencer(fechaFin: string): number {
-  const [anio, mes, dia] = fechaFin.split('-').map(Number);
-  const fin = Date.UTC(anio, mes - 1, dia);
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(fechaFin);
+  if (!m) return Number.NaN;
+  const fin = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
   const ahora = new Date();
-  const hoy = Date.UTC(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
-  return Math.round((fin - hoy) / 86_400_000);
+  const hoy = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
+  return Math.round((fin.getTime() - hoy.getTime()) / 86_400_000);
 }
 
 export function calcularVigencia(fechaFin: string, estado: EstadoSuscripcion): Vigencia {
@@ -64,7 +65,7 @@ export function calcularVigencia(fechaFin: string, estado: EstadoSuscripcion): V
   if (estado === 'cancelada') {
     return { nivel: 'cancelada', dias, etiqueta: 'Cancelada', tono: 'neutro' };
   }
-  if (dias < 0) {
+  if (estado === 'vencida' || dias < 0) {
     const hace = Math.abs(dias);
     return {
       nivel: 'vencida',
@@ -74,31 +75,55 @@ export function calcularVigencia(fechaFin: string, estado: EstadoSuscripcion): V
     };
   }
   if (dias === 0) {
-    return { nivel: 'critica', dias, etiqueta: 'Vence hoy', tono: 'peligro' };
+    const critica: Vigencia = { nivel: 'critica', dias, etiqueta: 'Vence hoy', tono: 'peligro' };
+    if (estado === 'prueba') return { ...critica, etiqueta: 'Prueba · Vence hoy', tono: 'info' };
+    return critica;
   }
 
   const etiqueta = dias === 1 ? 'Vence mañana' : `Vence en ${dias} días`;
-  if (dias <= 7) return { nivel: 'critica', dias, etiqueta, tono: 'peligro' };
+  if (dias <= 7) {
+    const critica: Vigencia = { nivel: 'critica', dias, etiqueta, tono: 'peligro' };
+    if (estado === 'prueba') return { ...critica, etiqueta: `Prueba · ${etiqueta}`, tono: 'info' };
+    return critica;
+  }
   if (dias <= 15) return { nivel: 'proxima', dias, etiqueta, tono: 'aviso' };
-  if (dias <= 30) return { nivel: 'proxima', dias, etiqueta, tono: 'aviso' };
+  if (dias <= 30) {
+    const proxima: Vigencia = { nivel: 'proxima', dias, etiqueta, tono: 'aviso' };
+    if (estado === 'prueba') {
+      return { ...proxima, etiqueta: `Prueba · ${etiqueta}`, tono: 'info' };
+    }
+    return proxima;
+  }
+
+  if (estado === 'prueba') {
+    return { nivel: 'vigente', dias, etiqueta: 'Prueba', tono: 'info' };
+  }
 
   return { nivel: 'vigente', dias, etiqueta: 'Vigente', tono: 'exito' };
 }
 
-/** Cuenta cuantas suscripciones caen en cada bucket de aviso, para el tablero. */
+/** Contadores del tablero: en curso (activa/prueba vigente) y buckets de aviso. */
 export function resumirAlertas(
   suscripciones: Array<{ fechaFin: string; estado: EstadoSuscripcion }>,
 ) {
-  const resumen = { vencidas: 0, en7: 0, en15: 0, en30: 0, vigentes: 0 };
+  const resumen = { enCurso: 0, vencidas: 0, en7: 0, en15: 0, en30: 0, estables: 0 };
 
   for (const s of suscripciones) {
     if (s.estado === 'cancelada') continue;
+
+    if (!esSuscripcionVigente(s)) {
+      if (s.estado === 'vencida' || diasParaVencer(s.fechaFin) < 0) {
+        resumen.vencidas += 1;
+      }
+      continue;
+    }
+
+    resumen.enCurso += 1;
     const dias = diasParaVencer(s.fechaFin);
-    if (dias < 0) resumen.vencidas += 1;
-    else if (dias <= 7) resumen.en7 += 1;
+    if (dias <= 7) resumen.en7 += 1;
     else if (dias <= 15) resumen.en15 += 1;
     else if (dias <= 30) resumen.en30 += 1;
-    else resumen.vigentes += 1;
+    else resumen.estables += 1;
   }
 
   return resumen;

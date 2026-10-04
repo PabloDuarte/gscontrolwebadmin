@@ -1,19 +1,21 @@
 import 'dotenv/config';
 import bcrypt from 'bcryptjs';
 import { eq } from 'drizzle-orm';
-import mysql from 'mysql2/promise';
-import { drizzle } from 'drizzle-orm/mysql2';
+import { drizzle } from 'drizzle-orm/postgres-js';
+import postgres from 'postgres';
 import { planes, usuariosAdmin } from '../src/lib/db/schema';
 
-const pool = mysql.createPool({
-  host: '127.0.0.1',
-  port: Number(process.env.LOCAL_TUNNEL_PORT ?? 3307),
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.CONTROL_DB_NAME ?? 'gscontrol_clientes',
-});
+const url = process.env.DATABASE_URL;
+if (!url) {
+  throw new Error('Define DATABASE_URL en .env antes de sembrar.');
+}
 
-const db = drizzle(pool);
+const client = postgres(url, {
+  prepare: false,
+  max: 1,
+  ssl: url.includes('supabase') ? 'require' : undefined,
+});
+const db = drizzle(client);
 
 const catalogo = [
   {
@@ -91,4 +93,4 @@ if (admin) {
   console.log(`Administrador ${email} creado.`);
 }
 
-await pool.end();
+await client.end({ timeout: 5 });

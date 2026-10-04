@@ -3,40 +3,17 @@
 import { useActionState, useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { useFormStatus } from 'react-dom';
 import Link from 'next/link';
-import { AlertCircle, CheckCircle2, Eye, EyeOff, PlugZap, XCircle } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 import { LogoEmpresa } from '@/components/brand-logo';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { DateSelect, Field, Input, Select, Textarea } from '@/components/ui/field';
-import {
-  ESTADOS_EMPRESA,
-  PASSWORD_ENMASCARADA,
-  capitalizar,
-  type EstadoVerificacionBd,
-} from '@/lib/dominio';
+import { ESTADOS_EMPRESA, capitalizar } from '@/lib/dominio';
 import { parsearTelefono } from '@/lib/empresa';
-import { formatearFecha } from '@/lib/utils';
-import {
-  guardarEmpresa,
-  probarConexionDesdeFormulario,
-  type EstadoFormulario,
-} from './actions';
-
-/** Datos de conexion. La contraseña se descifra en el servidor para poder verla. */
-export type ConexionVisible = {
-  nombreBd: string;
-  host: string;
-  puerto: number;
-  usuario: string;
-  password?: string;
-  verificadaEn?: string | Date | null;
-  estadoVerificacion?: EstadoVerificacionBd | null;
-  /** False cuando los datos salen de la conexión de licenciamiento y aún no se guardan en la ficha. */
-  guardada?: boolean;
-};
+import { guardarEmpresa, type EstadoFormulario } from './actions';
 
 export type EmpresaVisible = {
-  id: number;
+  id: string;
   codigo: string;
   nombreComercial: string;
   razonSocial: string | null;
@@ -61,10 +38,7 @@ function Guardar() {
   );
 }
 
-function camposIniciales(
-  empresa: EmpresaVisible | undefined,
-  conexion: ConexionVisible | null | undefined,
-): Campos {
+function camposIniciales(empresa: EmpresaVisible | undefined): Campos {
   const hoy = new Date().toISOString().slice(0, 10);
   const telefono = parsearTelefono(empresa?.contactoTelefono);
   return {
@@ -79,25 +53,13 @@ function camposIniciales(
     telefonoArea: telefono.area,
     telefonoNumero: telefono.numero,
     notas: empresa?.notas ?? '',
-    nombreBd: (conexion?.nombreBd ?? '').toUpperCase(),
-    usuario: conexion?.usuario ?? '',
-    host: conexion?.host ?? '127.0.0.1',
-    puerto: String(conexion?.puerto ?? 3306),
-    password: conexion?.password || (conexion ? PASSWORD_ENMASCARADA : ''),
   };
 }
 
-export function EmpresaForm({
-  empresa,
-  conexion,
-}: {
-  empresa?: EmpresaVisible;
-  conexion?: ConexionVisible | null;
-}) {
+export function EmpresaForm({ empresa }: { empresa?: EmpresaVisible }) {
   const logoRef = useRef<File | null>(null);
   const [vistaPrevia, setVistaPrevia] = useState<string | null>(empresa?.logoPath ?? null);
-  const [campos, setCampos] = useState<Campos>(() => camposIniciales(empresa, conexion));
-  const [verPassword, setVerPassword] = useState(true);
+  const [campos, setCampos] = useState<Campos>(() => camposIniciales(empresa));
 
   const [estado, accion] = useActionState<EstadoFormulario | undefined, FormData>(
     async (previo, datos) => {
@@ -110,13 +72,8 @@ export function EmpresaForm({
     },
     undefined,
   );
-  const [estadoPrueba, accionPrueba] = useActionState<EstadoFormulario | undefined, FormData>(
-    probarConexionDesdeFormulario,
-    undefined,
-  );
 
-  const error = (campo: string) => estado?.errores?.[campo] ?? estadoPrueba?.errores?.[campo];
-  const esEdicion = Boolean(empresa);
+  const error = (campo: string) => estado?.errores?.[campo];
 
   const setCampo =
     (nombre: string) =>
@@ -140,8 +97,6 @@ export function EmpresaForm({
     }
   }, [estado?.errores]);
 
-  // Tras un error, React puede resetear inputs no controlados; rehidratar desde el servidor
-  // sin tocar los campos válidos ya en memoria (solo sincroniza lo que vino en valores).
   useEffect(() => {
     if (!estado?.valores) return;
     setCampos((prev) => ({ ...prev, ...estado.valores }));
@@ -150,10 +105,29 @@ export function EmpresaForm({
   return (
     <form action={accion} className="space-y-6">
       {empresa ? <input type="hidden" name="id" value={empresa.id} /> : null}
-      {empresa ? <input type="hidden" name="empresaId" value={empresa.id} /> : null}
+
+      {empresa ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Llave de tenant (Supabase)</CardTitle>
+            <CardDescription>
+              Usa este UUID como <code className="text-xs">empresa_id</code> en tablas con RLS. El
+              código es legible para operación interna.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4 sm:grid-cols-2">
+            <Field label="empresa_id" htmlFor="empresaId">
+              <Input id="empresaId" name="empresaIdDisplay" value={empresa.id} readOnly />
+            </Field>
+            <Field label="Código" htmlFor="codigoDisplay">
+              <Input id="codigoDisplay" value={empresa.codigo} readOnly />
+            </Field>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <Card>
-        <CardHeader className="flex-row items-start justify-between gap-4 space-y-0">
+        <CardHeader className="sticky top-4 z-20 flex-row items-start justify-between gap-4 space-y-0 rounded-3xl bg-white/95 shadow-apple backdrop-blur-xl dark:bg-[#161617]/95">
           <div className="space-y-1.5">
             <CardTitle>Datos de la empresa</CardTitle>
             <CardDescription>
@@ -335,122 +309,6 @@ export function EmpresaForm({
           </Field>
         </CardContent>
       </Card>
-
-      {esEdicion ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Base de datos de la empresa</CardTitle>
-            <CardDescription>
-              {conexion?.guardada === false
-                ? 'Tomados de la conexión de licenciamiento y de la base que ya existe en el servidor. La prueba usa el túnel que está corriendo en la terminal.'
-                : conexion
-                  ? `Guardada: ${conexion.nombreBd} · ${conexion.usuario}@${conexion.host}:${conexion.puerto}. La prueba usa el túnel de licenciamiento.`
-                  : 'Conexión directa a MySQL. La prueba usa el túnel de licenciamiento que está corriendo en la terminal.'}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Nombre de la base" htmlFor="nombreBd" error={error('nombreBd')}>
-                  <Input
-                    id="nombreBd"
-                    name="nombreBd"
-                    value={campos.nombreBd}
-                    onChange={setCampoMayus('nombreBd')}
-                    className="uppercase"
-                  />
-                </Field>
-
-                <Field label="Usuario" htmlFor="usuario" error={error('usuario')}>
-                  <Input
-                    id="usuario"
-                    name="usuario"
-                    value={campos.usuario}
-                    onChange={setCampo('usuario')}
-                  />
-                </Field>
-
-                <Field label="Host" htmlFor="host" error={error('host')}>
-                  <Input id="host" name="host" value={campos.host} onChange={setCampo('host')} />
-                </Field>
-
-                <Field label="Puerto" htmlFor="puerto" error={error('puerto')}>
-                  <Input
-                    id="puerto"
-                    name="puerto"
-                    type="number"
-                    value={campos.puerto}
-                    onChange={setCampo('puerto')}
-                  />
-                </Field>
-
-                <Field
-                  label="Contraseña"
-                  htmlFor="password"
-                  error={error('password')}
-                  hint="Visible para revisarla. El ojo la oculta."
-                  className="sm:col-span-2"
-                >
-                  <div className="relative">
-                    <Input
-                      id="password"
-                      name="password"
-                      type={verPassword ? 'text' : 'password'}
-                      autoComplete="new-password"
-                      value={campos.password}
-                      onChange={setCampo('password')}
-                      className="pr-12"
-                    />
-                    <button
-                      type="button"
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
-                      onClick={() => setVerPassword((v) => !v)}
-                      aria-label={verPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
-                    >
-                      {verPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                    </button>
-                  </div>
-                </Field>
-
-                <div className="flex flex-wrap items-center gap-3 border-t border-black/5 pt-4 sm:col-span-2 dark:border-white/10">
-                  <Button
-                    type="submit"
-                    formAction={accionPrueba}
-                    formNoValidate
-                    variant="outline"
-                    size="sm"
-                  >
-                    <PlugZap />
-                    Probar conexión
-                  </Button>
-                  <p className="text-sm text-muted-foreground">
-                    {conexion?.estadoVerificacion === 'verificada' && conexion.verificadaEn
-                      ? `Verificada el ${formatearFecha(conexion.verificadaEn)}.`
-                      : conexion?.estadoVerificacion === 'no_existe' && conexion.verificadaEn
-                        ? `No existe. Última prueba el ${formatearFecha(conexion.verificadaEn)}.`
-                        : 'Puedes probar los parámetros antes de guardar.'}
-                  </p>
-                  {estadoPrueba?.mensaje ? (
-                    <p
-                      className={`flex items-center gap-1.5 text-sm ${
-                        estadoPrueba.ok
-                          ? 'text-emerald-600 dark:text-emerald-400'
-                          : 'text-destructive'
-                      }`}
-                    >
-                      {estadoPrueba.ok ? (
-                        <CheckCircle2 className="size-4" />
-                      ) : (
-                        <XCircle className="size-4" />
-                      )}
-                      {estadoPrueba.mensaje}
-                    </p>
-                  ) : null}
-                </div>
-              </div>
-          </CardContent>
-        </Card>
-      ) : null}
-
     </form>
   );
 }

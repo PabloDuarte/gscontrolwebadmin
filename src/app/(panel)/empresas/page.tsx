@@ -26,7 +26,9 @@ export default async function EmpresasPage({
       !busqueda ||
       empresa.nombreComercial.toLowerCase().includes(busqueda) ||
       (empresa.rfc ?? '').toLowerCase().includes(busqueda) ||
-      (empresa.razonSocial ?? '').toLowerCase().includes(busqueda);
+      (empresa.razonSocial ?? '').toLowerCase().includes(busqueda) ||
+      empresa.id.toLowerCase().includes(busqueda) ||
+      empresa.codigo.toLowerCase().includes(busqueda);
     const coincideEstado = !estado || empresa.estado === estado;
     return coincideTexto && coincideEstado;
   });
@@ -48,7 +50,7 @@ export default async function EmpresasPage({
         <Input
           name="q"
           defaultValue={q}
-          placeholder="Buscar por nombre o RFC…"
+          placeholder="Buscar por nombre, RFC o empresa_id…"
           className="h-11 max-w-xs rounded-full"
         />
         <Select name="estado" defaultValue={estado} className="h-11 max-w-[12rem] rounded-full">
@@ -89,22 +91,16 @@ export default async function EmpresasPage({
                   <TH>Estado</TH>
                   <TH>Plan</TH>
                   <TH>Vigencia</TH>
-                  <TH>Base de datos</TH>
+                  <TH>empresa_id</TH>
                 </TR>
               </THead>
               <TBody>
-                {filas.map(({ empresa, conexion, suscripcion, plan, requiereRenovacion }) => {
+                {filas.map(({ empresa, suscripcion, plan, requiereRenovacion }) => {
                   const vigente = suscripcion ? esSuscripcionVigente(suscripcion) : false;
                   const vigencia =
                     suscripcion && vigente
                       ? calcularVigencia(suscripcion.fechaFin, suscripcion.estado)
                       : null;
-                  const verificacion =
-                    conexion?.estadoVerificacion === 'verificada'
-                      ? 'verificada'
-                      : conexion?.estadoVerificacion === 'no_existe'
-                        ? 'no existe'
-                        : null;
 
                   return (
                     <FilaEmpresa key={empresa.id} href={`/empresas/${empresa.id}`}>
@@ -146,28 +142,8 @@ export default async function EmpresasPage({
                           </span>
                         )}
                       </TD>
-                      <TD className="text-xs">
-                        {conexion ? (
-                          <div className="space-y-1">
-                            <p className="font-medium">{conexion.nombreBd}</p>
-                            {verificacion ? (
-                              <>
-                                <Badge tono={verificacion === 'verificada' ? 'exito' : 'peligro'}>
-                                  {verificacion}
-                                </Badge>
-                                {conexion.verificadaEn ? (
-                                  <p className="text-muted-foreground">
-                                    {formatearFecha(conexion.verificadaEn)}
-                                  </p>
-                                ) : null}
-                              </>
-                            ) : (
-                              <span className="text-muted-foreground">sin verificar</span>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground">Base de datos sin configurar</span>
-                        )}
+                      <TD className="max-w-[10rem] truncate font-mono text-xs text-muted-foreground">
+                        {empresa.id}
                       </TD>
                     </FilaEmpresa>
                   );
