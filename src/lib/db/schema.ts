@@ -5,6 +5,7 @@ import {
   index,
   integer,
   numeric,
+  customType,
   pgEnum,
   pgTable,
   text,
@@ -17,6 +18,17 @@ import {
   ESTADOS_SUSCRIPCION,
   PERIODICIDADES,
 } from '../dominio';
+
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({
+  dataType() {
+    return 'bytea';
+  },
+  fromDriver(value: unknown): Buffer {
+    if (Buffer.isBuffer(value)) return value;
+    if (value instanceof Uint8Array) return Buffer.from(value);
+    throw new Error('logo_bytes no legible');
+  },
+});
 
 export const estadoEmpresaEnum = pgEnum('estado_empresa', ESTADOS_EMPRESA);
 export const estadoSuscripcionEnum = pgEnum('estado_suscripcion', ESTADOS_SUSCRIPCION);
@@ -60,6 +72,8 @@ export const empresas = pgTable(
     estado: estadoEmpresaEnum('estado').notNull().default('activo'),
     fechaAlta: date('fecha_alta', { mode: 'string' }).notNull(),
     logoPath: varchar('logo_path', { length: 255 }),
+    logoMime: varchar('logo_mime', { length: 40 }),
+    logoBytes: bytea('logo_bytes'),
     notas: text('notas'),
     ...timestamps,
   },

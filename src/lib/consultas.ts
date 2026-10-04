@@ -1,5 +1,5 @@
 import 'server-only';
-import { asc, desc, eq } from 'drizzle-orm';
+import { asc, desc, eq, getTableColumns } from 'drizzle-orm';
 import { db } from '@/lib/db/control';
 import { empresas, planes, suscripciones } from '@/lib/db/schema';
 import { elegirSuscripcionActual, esSuscripcionVigente } from '@/lib/suscripciones';
@@ -8,12 +8,14 @@ import { esUuid } from '@/lib/uuid';
 
 export { esUuid as esUuidEmpresa };
 
+const { logoBytes: _logoBytes, ...columnasEmpresa } = getTableColumns(empresas);
+
 /** Empresa con su suscripcion actual. */
 export async function listarEmpresas() {
   await cerrarSuscripcionesVencidas();
 
   const [filasEmpresas, filasSuscripciones, filasPlanes] = await Promise.all([
-    db.select().from(empresas).orderBy(asc(empresas.nombreComercial)),
+    db.select(columnasEmpresa).from(empresas).orderBy(asc(empresas.nombreComercial)),
     db.select().from(suscripciones).orderBy(desc(suscripciones.fechaFin)),
     db.select().from(planes),
   ]);
@@ -44,7 +46,11 @@ export async function obtenerEmpresa(id: string) {
   if (!esUuid(id)) return null;
   await cerrarSuscripcionesVencidas(id);
 
-  const [empresa] = await db.select().from(empresas).where(eq(empresas.id, id)).limit(1);
+  const [empresa] = await db
+    .select(columnasEmpresa)
+    .from(empresas)
+    .where(eq(empresas.id, id))
+    .limit(1);
   if (!empresa) return null;
 
   const [historial, catalogoPlanes] = await Promise.all([
