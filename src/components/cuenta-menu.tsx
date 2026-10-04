@@ -123,7 +123,7 @@ export function CuentaMenu({
             role="dialog"
             aria-modal="true"
             aria-labelledby="confirmar-salida"
-            className="w-full max-w-sm space-y-5 rounded-3xl border border-black/5 bg-white/95 p-6 shadow-apple-lg backdrop-blur-xl dark:border-white/10 dark:bg-[#161617]/95"
+            className="w-full max-w-sm space-y-5 rounded-3xl border border-black/5 bg-white/95 p-6 text-black shadow-apple-lg backdrop-blur-xl dark:border-white/10 dark:bg-[#161617]/95 dark:text-white"
             onMouseDown={(e) => e.stopPropagation()}
           >
             <p id="confirmar-salida" className="text-[17px] font-medium tracking-tight">
@@ -150,13 +150,13 @@ export function CuentaMenu({
         >
           <form
             action={accion}
-            className="w-full max-w-sm space-y-4 rounded-3xl border border-black/5 bg-white/95 p-6 shadow-apple-lg backdrop-blur-xl dark:border-white/10 dark:bg-[#161617]/95"
+            className="w-full max-w-lg space-y-4 rounded-3xl border border-black/5 bg-white/95 p-6 text-black shadow-apple-lg backdrop-blur-xl dark:border-white/10 dark:bg-[#161617]/95 dark:text-white"
             onMouseDown={(e) => e.stopPropagation()}
           >
-            <div className="flex items-start justify-between gap-3">
-              <div>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
                 <p className="text-[17px] font-medium tracking-tight">Cambiar contraseña</p>
-                <p className="mt-1 text-sm text-muted-foreground">{correo}</p>
+                <p className="mt-1 truncate text-sm text-muted-foreground">{correo}</p>
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 <Button type="button" variant="outline" size="sm" onClick={() => setContrasena(false)}>
