@@ -23,6 +23,9 @@ npm-debug.log*
 .next/
 out/
 
+# TypeScript (caché incremental local)
+*.tsbuildinfo
+
 # Logos subidos de empresas (el branding de Intecontrol sí se versiona)
 public/uploads/**
 !public/uploads/.gitkeep
