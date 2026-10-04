@@ -11,6 +11,7 @@
     "check-db": "node scripts/check-db.js",
     "db:push": "drizzle-kit push",
     "db:migrate-es-prueba": "node scripts/migrate-es-prueba.js",
+    "db:migrate-logo": "node scripts/migrate-logo-empresa.js",
     "db:seed": "tsx scripts/seed.ts"
   },
   "dependencies": {

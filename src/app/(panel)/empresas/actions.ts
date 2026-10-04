@@ -16,7 +16,7 @@ import {
 } from '@/lib/empresa';
 import { esSuscripcionVigente } from '@/lib/suscripciones';
 import { cerrarSuscripcionesVencidas } from '@/lib/suscripciones-vencimiento';
-import { borrarLogoEmpresa, guardarLogoEmpresa, validarLogo } from '@/lib/uploads';
+import { leerLogoEmpresa, rutaLogoEmpresa, validarLogo } from '@/lib/uploads';
 
 export type EstadoFormulario = {
   ok?: boolean;
@@ -150,41 +150,33 @@ export async function guardarEmpresa(
   }
 
   let empresaId = id;
-  let logoAnterior: string | null = null;
 
   try {
-    if (empresaId) {
-      const [actual] = await db
-        .select({ logoPath: empresas.logoPath })
-        .from(empresas)
-        .where(eq(empresas.id, empresaId))
-        .limit(1);
-      logoAnterior = actual?.logoPath ?? null;
-    }
-
     const codigo = valores.rfc;
-
-    let logoPath = logoAnterior;
-    if (logo && logo.size > 0) {
-      logoPath = await guardarLogoEmpresa(codigo, logo);
-    }
+    const logoLeido = logo && logo.size > 0 ? await leerLogoEmpresa(logo) : null;
 
     const ficha = {
       ...valores,
       codigo,
       contactoTelefono,
-      logoPath,
+      ...(logoLeido ? { logoMime: logoLeido.mime, logoBytes: logoLeido.bytes } : {}),
     };
 
     if (empresaId) {
-      await db.update(empresas).set(ficha).where(eq(empresas.id, empresaId));
+      await db
+        .update(empresas)
+        .set({
+          ...ficha,
+          ...(logoLeido ? { logoPath: rutaLogoEmpresa(empresaId) } : {}),
+        })
+        .where(eq(empresas.id, empresaId));
     } else {
-      const [insertado] = await db.insert(empresas).values(ficha).returning({ id: empresas.id });
-      empresaId = insertado.id;
-    }
-
-    if (logo && logo.size > 0 && logoAnterior && logoAnterior !== logoPath) {
-      await borrarLogoEmpresa(logoAnterior);
+      empresaId = crypto.randomUUID();
+      await db.insert(empresas).values({
+        ...ficha,
+        id: empresaId,
+        ...(logoLeido ? { logoPath: rutaLogoEmpresa(empresaId) } : {}),
+      });
     }
   } catch (error) {
     return conValores(crudo, { mensaje: mensajeDeError(error) });
@@ -200,13 +192,7 @@ export async function eliminarEmpresa(datos: FormData) {
   await exigirSesion();
   const id = String(datos.get('id') ?? '');
   if (esUuidEmpresa(id)) {
-    const [actual] = await db
-      .select({ logoPath: empresas.logoPath })
-      .from(empresas)
-      .where(eq(empresas.id, id))
-      .limit(1);
     await db.delete(empresas).where(eq(empresas.id, id));
-    await borrarLogoEmpresa(actual?.logoPath);
   }
   revalidatePath('/empresas');
   revalidatePath('/');
